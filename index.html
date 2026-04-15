@@ -1,80 +1,111 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>テニス分析</title>
-
 <style>
-body { font-family: sans-serif; padding: 10px; }
+body { font-family: sans-serif; text-align: center; }
 button {
-  width: 48%;
-  padding: 15px;
-  font-size: 18px;
-  margin: 1%;
-  border: none;
-  border-radius: 10px;
+  width: 80%;
+  padding: 20px;
+  margin: 10px;
+  font-size: 20px;
 }
-.win { background: #4CAF50; color: white; }
-.lose { background: #f44336; color: white; }
-.tag { background: #ddd; }
-.selected { background: #2196F3; color: white; }
-.full { width: 98%; background: black; color: white; }
 </style>
 </head>
-
 <body>
 
-<h2>テニス分析</h2>
-
-<div>
-<button class="win" onclick="setResult('win')">取った</button>
-<button class="lose" onclick="setResult('lose')">取られた</button>
-</div>
-
-<h3>内容</h3>
-
-<div>
-<button class="tag" onclick="toggleTag(this,'FS')">FS</button>
-<button class="tag" onclick="toggleTag(this,'DF')">DF</button>
-<button class="tag" onclick="toggleTag(this,'WF')">WF</button>
-<button class="tag" onclick="toggleTag(this,'UE')">UE</button>
-<button class="tag" onclick="toggleTag(this,'NET')">NET</button>
-<button class="tag" onclick="toggleTag(this,'RET')">RET</button>
-</div>
-
-<br>
-
-<button class="full" onclick="savePoint()">保存</button>
+<h2 id="title">試合開始</h2>
+<div id="app"></div>
 
 <script>
-let current = { result:"", tags:[] };
+let state = "start";
+let current = {};
 let data = JSON.parse(localStorage.getItem("tennisData") || "[]");
 
-function setResult(r){
-  current.result = r;
-}
+function render() {
+  const app = document.getElementById("app");
 
-function toggleTag(btn, tag){
-  if(current.tags.includes(tag)){
-    current.tags = current.tags.filter(t=>t!==tag);
-    btn.classList.remove("selected");
-  } else {
-    current.tags.push(tag);
-    btn.classList.add("selected");
+  if (state === "start") {
+    app.innerHTML = `<button onclick="next('point')">試合開始</button>`;
+  }
+
+  else if (state === "point") {
+    app.innerHTML = `
+      <button onclick="setWinner('me')">自分</button>
+      <button onclick="setWinner('opponent')">相手</button>
+    `;
+  }
+
+  else if (state === "type") {
+    app.innerHTML = `
+      <button onclick="setType('SA')">SA</button>
+      <button onclick="setType('Rally')">Rally</button>
+    `;
+  }
+
+  else if (state === "rally1") {
+    app.innerHTML = `
+      <button onclick="setDetail('side','F')">F</button>
+      <button onclick="setDetail('side','B')">B</button>
+    `;
+  }
+
+  else if (state === "rally2") {
+    app.innerHTML = `
+      <button onclick="setDetail('style','S')">S</button>
+      <button onclick="setDetail('style','V')">V</button>
+    `;
+  }
+
+  else if (state === "rally3") {
+    app.innerHTML = `
+      <button onclick="setDetail('result','O')">O</button>
+      <button onclick="setDetail('result','N')">N</button>
+    `;
   }
 }
 
-function savePoint(){
+function next(s) {
+  state = s;
+  render();
+}
+
+function setWinner(w) {
+  current = { winner: w };
+  next("type");
+}
+
+function setType(t) {
+  current.type = t;
+
+  if (t === "SA") {
+    save();
+  } else {
+    current.detail = {};
+    next("rally1");
+  }
+}
+
+function setDetail(key, val) {
+  current.detail[key] = val;
+
+  if (state === "rally1") next("rally2");
+  else if (state === "rally2") next("rally3");
+  else if (state === "rally3") save();
+}
+
+function save() {
   current.time = new Date().toISOString();
-  data.push({...current});
+  data.push(current);
+
   localStorage.setItem("tennisData", JSON.stringify(data));
 
-  alert("保存OK");
-
-  current = { result:"", tags:[] };
-  document.querySelectorAll(".tag").forEach(b=>b.classList.remove("selected"));
+  alert("保存！");
+  state = "point";
+  render();
 }
+
+render();
 </script>
 
 </body>

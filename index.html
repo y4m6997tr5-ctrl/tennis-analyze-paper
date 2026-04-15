@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body { font-family: sans-serif; text-align: center; margin:0; }
+body { font-family: sans-serif; margin:0; }
 
 #score {
   position: fixed;
@@ -11,13 +11,15 @@ body { font-family: sans-serif; text-align: center; margin:0; }
   width: 100%;
   background: black;
   color: white;
-  padding: 10px;
+  padding: 12px;
   font-size: 18px;
+  text-align: center;
 }
 
 #app {
-  padding-top: 80px;
-  padding-bottom: 140px;
+  padding-top: 90px;
+  padding-bottom: 180px;
+  text-align: center;
 }
 
 #controls {
@@ -25,16 +27,21 @@ body { font-family: sans-serif; text-align: center; margin:0; }
   bottom: 0;
   width: 100%;
   background: #eee;
-  padding: 10px;
+  padding: 20px 0;
 }
 
 button {
-  width: 80%;
-  padding: 18px;
-  margin: 8px;
-  font-size: 18px;
+  width: 85%;
+  padding: 22px;
+  margin: 10px;
+  font-size: 20px;
 }
 
+textarea {
+  width: 95%;
+  height: 300px;
+  font-size: 14px;
+}
 </style>
 </head>
 
@@ -68,20 +75,24 @@ function render(){
   const app = document.getElementById("app");
   const controls = document.getElementById("controls");
 
-  // 試合終了画面
+  // ===== 試合終了 =====
   if(match.finished){
+    let csv = generateCSV();
+
     app.innerHTML = `
       <h2>試合終了</h2>
       <h3>${match.sets[0]} - ${match.sets[1]}</h3>
+      <h4>記録データ</h4>
+      <textarea>${csv}</textarea>
+      <br>
+      <button onclick="downloadCSV()">CSVダウンロード</button>
     `;
 
-    controls.innerHTML = `
-      <button onclick="showCSV()">分析シートを見る</button>
-    `;
+    controls.innerHTML = ""; // ←操作UI完全削除
     return;
   }
 
-  // 通常フロー
+  // ===== 通常 =====
   if(state==="start"){
     controls.innerHTML = `<button onclick="next('point')">試合開始</button>`;
   }
@@ -169,7 +180,6 @@ function pointWon(player){
 
   if(match.tiebreak){
     match.tiebreakPoints[p]++;
-
     if(match.tiebreakPoints[p]>=7 && match.tiebreakPoints[p]-match.tiebreakPoints[o]>=2){
       gameWon(p);
       match.tiebreak=false;
@@ -177,7 +187,6 @@ function pointWon(player){
     }
   }else{
     match.currentGame[p]++;
-
     if(match.currentGame[p]>=4 && match.currentGame[p]-match.currentGame[o]>=2){
       gameWon(p);
     }
@@ -208,13 +217,13 @@ function setWon(p){
 
   if(match.sets[p]===2){
     match.finished = true;
+    render();
   }
 }
 
 // ===== 表示 =====
 function getScore(){
   let p = match.currentGame;
-
   let pointText;
 
   if(match.tiebreak){
@@ -240,7 +249,7 @@ function updateScore(){
 }
 
 // ===== CSV =====
-function showCSV(){
+function generateCSV(){
   let csv = "winner,type,detail,time\n";
 
   data.forEach(d=>{
@@ -248,15 +257,11 @@ function showCSV(){
     csv += `${d.winner},${d.type},"${detail}",${d.time}\n`;
   });
 
-  document.getElementById("app").innerHTML = `
-    <textarea style="width:95%;height:300px;">${csv}</textarea>
-    <br>
-    <button onclick="downloadCSV()">ダウンロード</button>
-  `;
+  return csv;
 }
 
 function downloadCSV(){
-  let blob = new Blob([document.querySelector("textarea").value], {type:"text/csv"});
+  let blob = new Blob([generateCSV()], {type:"text/csv"});
   let a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "tennis.csv";

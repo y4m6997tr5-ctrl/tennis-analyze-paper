@@ -2,19 +2,10 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body { font-family: sans-serif; text-align: center; }
-button {
-  width: 80%;
-  padding: 20px;
-  margin: 10px;
-  font-size: 20px;
-}
-</style>
 </head>
 <body>
 
-<h2 id="title">試合開始</h2>
+<h2 id="title">テニス分析</h2>
 <div id="app"></div>
 
 <script>
@@ -26,7 +17,7 @@ function render() {
   const app = document.getElementById("app");
 
   if (state === "start") {
-    app.innerHTML = `<button onclick="next('point')">試合開始</button>`;
+    app.innerHTML = '<button onclick="startMatch()">試合開始</button>';
   }
 
   else if (state === "point") {
@@ -65,14 +56,15 @@ function render() {
   }
 }
 
-function next(s) {
-  state = s;
+function startMatch() {
+  state = "point";
   render();
 }
 
 function setWinner(w) {
   current = { winner: w };
-  next("type");
+  state = "type";
+  render();
 }
 
 function setType(t) {
@@ -82,16 +74,24 @@ function setType(t) {
     save();
   } else {
     current.detail = {};
-    next("rally1");
+    state = "rally1";
+    render();
   }
 }
 
 function setDetail(key, val) {
   current.detail[key] = val;
 
-  if (state === "rally1") next("rally2");
-  else if (state === "rally2") next("rally3");
-  else if (state === "rally3") save();
+  if (state === "rally1") {
+    state = "rally2";
+  } else if (state === "rally2") {
+    state = "rally3";
+  } else if (state === "rally3") {
+    save();
+    return;
+  }
+
+  render();
 }
 
 function save() {
@@ -100,7 +100,6 @@ function save() {
 
   localStorage.setItem("tennisData", JSON.stringify(data));
 
-  alert("保存！");
   state = "point";
   render();
 }

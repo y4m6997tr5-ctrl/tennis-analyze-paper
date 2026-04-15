@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>テニス分析</title>
+
+<style>
+body { font-family: sans-serif; padding: 10px; }
+button {
+  width: 48%;
+  padding: 15px;
+  font-size: 18px;
+  margin: 1%;
+  border: none;
+  border-radius: 10px;
+}
+.win { background: #4CAF50; color: white; }
+.lose { background: #f44336; color: white; }
+.tag { background: #ddd; }
+.selected { background: #2196F3; color: white; }
+.full { width: 98%; background: black; color: white; }
+</style>
+</head>
+
+<body>
+
+<h2>テニス分析</h2>
+
+<div>
+<button class="win" onclick="setResult('win')">取った</button>
+<button class="lose" onclick="setResult('lose')">取られた</button>
+</div>
+
+<h3>内容</h3>
+
+<div>
+<button class="tag" onclick="toggleTag(this,'FS')">FS</button>
+<button class="tag" onclick="toggleTag(this,'DF')">DF</button>
+<button class="tag" onclick="toggleTag(this,'WF')">WF</button>
+<button class="tag" onclick="toggleTag(this,'UE')">UE</button>
+<button class="tag" onclick="toggleTag(this,'NET')">NET</button>
+<button class="tag" onclick="toggleTag(this,'RET')">RET</button>
+</div>
+
+<br>
+
+<button class="full" onclick="savePoint()">保存</button>
+
+<script>
+let current = { result:"", tags:[] };
+let data = JSON.parse(localStorage.getItem("tennisData") || "[]");
+
+function setResult(r){
+  current.result = r;
+}
+
+function toggleTag(btn, tag){
+  if(current.tags.includes(tag)){
+    current.tags = current.tags.filter(t=>t!==tag);
+    btn.classList.remove("selected");
+  } else {
+    current.tags.push(tag);
+    btn.classList.add("selected");
+  }
+}
+
+function savePoint(){
+  current.time = new Date().toISOString();
+  data.push({...current});
+  localStorage.setItem("tennisData", JSON.stringify(data));
+
+  alert("保存OK");
+
+  current = { result:"", tags:[] };
+  document.querySelectorAll(".tag").forEach(b=>b.classList.remove("selected"));
+}
+</script>
+
+</body>
+</html>

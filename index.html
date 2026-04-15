@@ -2,10 +2,19 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family: sans-serif; text-align: center; }
+button {
+  width: 80%;
+  padding: 20px;
+  margin: 10px;
+  font-size: 20px;
+}
+</style>
 </head>
 <body>
 
-<h2 id="title">テニス分析</h2>
+<h2 id="title"></h2>
 <div id="app"></div>
 
 <script>
@@ -15,12 +24,20 @@ let data = JSON.parse(localStorage.getItem("tennisData") || "[]");
 
 function render() {
   const app = document.getElementById("app");
+  const title = document.getElementById("title");
+
+  // 毎回リセット
+  app.innerHTML = "";
 
   if (state === "start") {
-    app.innerHTML = '<button onclick="startMatch()">試合開始</button>';
+    title.innerText = "試合開始";
+    app.innerHTML = `
+      <button onclick="startMatch()">試合開始</button>
+    `;
   }
 
   else if (state === "point") {
+    title.innerText = "ポイントを取ったのは？";
     app.innerHTML = `
       <button onclick="setWinner('me')">自分</button>
       <button onclick="setWinner('opponent')">相手</button>
@@ -28,6 +45,7 @@ function render() {
   }
 
   else if (state === "type") {
+    title.innerText = "SA or Rally？";
     app.innerHTML = `
       <button onclick="setType('SA')">SA</button>
       <button onclick="setType('Rally')">Rally</button>
@@ -35,6 +53,7 @@ function render() {
   }
 
   else if (state === "rally1") {
+    title.innerText = "F or B？";
     app.innerHTML = `
       <button onclick="setDetail('side','F')">F</button>
       <button onclick="setDetail('side','B')">B</button>
@@ -42,6 +61,7 @@ function render() {
   }
 
   else if (state === "rally2") {
+    title.innerText = "S or V？";
     app.innerHTML = `
       <button onclick="setDetail('style','S')">S</button>
       <button onclick="setDetail('style','V')">V</button>
@@ -49,6 +69,7 @@ function render() {
   }
 
   else if (state === "rally3") {
+    title.innerText = "O or N？";
     app.innerHTML = `
       <button onclick="setDetail('result','O')">O</button>
       <button onclick="setDetail('result','N')">N</button>
@@ -100,10 +121,13 @@ function save() {
 
   localStorage.setItem("tennisData", JSON.stringify(data));
 
+  // 次のポイントへ
+  current = {};
   state = "point";
   render();
 }
 
+// ← これが超重要（初期表示）
 render();
 </script>
 

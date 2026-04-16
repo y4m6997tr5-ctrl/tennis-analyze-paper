@@ -18,7 +18,7 @@ body { font-family: sans-serif; margin:0; }
 
 #app {
   padding-top: 100px;
-  padding-bottom: 160px;
+  padding-bottom: 180px;
   text-align: center;
 }
 
@@ -27,14 +27,14 @@ body { font-family: sans-serif; margin:0; }
   bottom: 0;
   width: 100%;
   background: #eee;
-  padding: 20px 0;
+  padding: 15px 0;
   text-align: center;
 }
 
 button {
   width: 70%;
-  padding: 20px;
-  margin: 8px;
+  padding: 18px;
+  margin: 6px;
   font-size: 18px;
 }
 
@@ -127,6 +127,7 @@ function render(){
       <button onclick="handleType('SA')">SA</button>
       <button onclick="handleType('F')">F</button>
       <button onclick="handleType('Rally')">Rally</button>
+      <button onclick="undo()">戻る</button>
     `;
   }
 
@@ -200,6 +201,8 @@ function handleFault(){
 
   if(faultCount[server]===1){
     save(null,"'");
+    state="type";
+    render();
   }else{
     let opp = server==="me"?"opponent":"me";
     pointWon(opp);
@@ -249,6 +252,11 @@ function save(winner, mark=null){
   current.server = server;
   current.time = new Date().toISOString();
 
+  // ★分析用データ
+  current.stroke = current.detail?.side || null;
+  current.position = current.detail?.style || null;
+  current.result = current.detail?.result || null;
+
   data.push(current);
   localStorage.setItem("tennisData", JSON.stringify(data));
 
@@ -259,10 +267,16 @@ function save(winner, mark=null){
 
 // ===== サーブ交代 =====
 function nextServe(){
-  serveCount++;
-  if(serveCount>=2){
-    server = server==="me"?"opponent":"me";
-    serveCount=0;
+  if(match.tiebreak){
+    serveCount++;
+
+    if(
+      (match.tiebreakPoints[0] + match.tiebreakPoints[1] === 1) ||
+      (serveCount === 2)
+    ){
+      server = server==="me"?"opponent":"me";
+      serveCount = 0;
+    }
   }
 }
 
@@ -293,6 +307,10 @@ function gameWon(p){
 
   match.currentSet[p]++;
   match.currentGame=[0,0];
+
+  // ★ゲームごとにサーブ交代
+  server = server==="me"?"opponent":"me";
+  serveCount = 0;
 
   if(match.currentSet[0]===6 && match.currentSet[1]===6){
     match.tiebreak=true;
@@ -339,14 +357,15 @@ function getScore(){
 }
 
 function updateScore(){
+  if(state==="setup") return;
   document.getElementById("score").innerHTML = getScore();
 }
 
 // ===== CSV =====
 function generateCSV(){
-  let csv="type,causePlayer,winner,mark,server,time\n";
+  let csv="type,causePlayer,winner,mark,server,stroke,position,result,time\n";
   data.forEach(d=>{
-    csv+=`${d.type},${d.causePlayer||""},${d.winner||""},${d.mark||""},${d.server},${d.time}\n`;
+    csv+=`${d.type},${d.causePlayer||""},${d.winner||""},${d.mark||""},${d.server},${d.stroke||""},${d.position||""},${d.result||""},${d.time}\n`;
   });
   return csv;
 }
@@ -357,6 +376,14 @@ function downloadCSV(){
   a.href=URL.createObjectURL(blob);
   a.download="tennis.csv";
   a.click();
+}
+
+// ===== Undo =====
+function undo(){
+  if(data.length===0) return;
+  data.pop();
+  localStorage.setItem("tennisData", JSON.stringify(data));
+  location.reload();
 }
 
 // ===== 初期 =====

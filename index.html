@@ -72,9 +72,7 @@ let data = JSON.parse(localStorage.getItem("tennisData") || "[]");
 // ===== サーブ =====
 let server = "me";
 let serveCount = 0;
-
-// ===== フォルト =====
-let faultCount = { me:0, opponent:0 };
+let servePhase = 1; // ★1st / 2nd
 
 // ===== スコア =====
 let match = {
@@ -110,10 +108,16 @@ function render(){
 
   if(match.finished){
     let csv = generateCSV();
+    let stats = calcServeStats();
 
     app.innerHTML = `
       <h2>試合終了</h2>
       <h3>${match.sets[0]} - ${match.sets[1]}</h3>
+
+      <p>1st成功率：${stats.firstRate}%</p>
+      <p>2nd成功率：${stats.secondRate}%</p>
+      <p>ダブルフォルト率：${stats.dfRate}%</p>
+
       <textarea style="width:95%;height:300px;">${csv}</textarea>
       <br>
       <button onclick="downloadCSV()">CSVダウンロード</button>
@@ -160,7 +164,10 @@ function render(){
     `;
   }
 
-  app.innerHTML = `<h3>サーバー: ${server==="me"?"自分":"相手"}</h3>`;
+  app.innerHTML = `
+    <h3>サーバー: ${server==="me"?"自分":"相手"}</h3>
+    <p>${servePhase===1 ? "1stサーブ" : "2ndサーブ"}</p>
+  `;
 }
 
 // ===== 試合開始 =====
@@ -179,14 +186,14 @@ function startMatch(){
 
 // ===== タイプ =====
 function handleType(t){
-  current = { type:t };
+  current = { type:t, servePhase: servePhase };
 
   if(t==="F"){ handleFault(); return; }
 
   if(t==="SA"){
-    faultCount[server]=0;
     pointWon(server);
     save(server);
+    servePhase = 1;
     return;
   }
 
@@ -197,18 +204,20 @@ function handleType(t){
 
 // ===== フォルト =====
 function handleFault(){
-  faultCount[server]++;
 
-  if(faultCount[server]===1){
-    save(null,"'");
+  if(servePhase === 1){
+    servePhase = 2;
+    save(null,"1F"); // ⬜︎F
     state="type";
     render();
-  }else{
-    let opp = server==="me"?"opponent":"me";
-    pointWon(opp);
-    save(opp,"DF");
-    faultCount[server]=0;
+    return;
   }
+
+  let opp = server==="me"?"opponent":"me";
+  pointWon(opp);
+  save(opp,"DF");
+
+  servePhase = 1;
 }
 
 // ===== ラリー =====
@@ -226,6 +235,7 @@ function setDetail(k,v){
   else{
     let winner = decidePoint(current.causePlayer, current.detail.result);
     save(winner);
+    servePhase = 1;
     return;
   }
 
@@ -245,19 +255,30 @@ function decidePoint(p, result){
   }
 }
 
-// ===== 保存 =====
+// ===== 保存（スナップショット付き） =====
 function save(winner, mark=null){
+
   current.winner = winner;
   current.mark = mark;
   current.server = server;
   current.time = new Date().toISOString();
 
-  // ★分析用データ
   current.stroke = current.detail?.side || null;
   current.position = current.detail?.style || null;
   current.result = current.detail?.result || null;
 
-  data.push(current);
+  let snapshot = JSON.parse(JSON.stringify({
+    match,
+    server,
+    serveCount,
+    servePhase
+  }));
+
+  data.push({
+    point: current,
+    snapshot: snapshot
+  });
+
   localStorage.setItem("tennisData", JSON.stringify(data));
 
   nextServe();
@@ -308,7 +329,6 @@ function gameWon(p){
   match.currentSet[p]++;
   match.currentGame=[0,0];
 
-  // ★ゲームごとにサーブ交代
   server = server==="me"?"opponent":"me";
   serveCount = 0;
 
@@ -363,9 +383,10 @@ function updateScore(){
 
 // ===== CSV =====
 function generateCSV(){
-  let csv="type,causePlayer,winner,mark,server,stroke,position,result,time\n";
+  let csv="type,servePhase,causePlayer,winner,mark,server,stroke,position,result,time\n";
   data.forEach(d=>{
-    csv+=`${d.type},${d.causePlayer||""},${d.winner||""},${d.mark||""},${d.server},${d.stroke||""},${d.position||""},${d.result||""},${d.time}\n`;
+    let p = d.point;
+    csv+=`${p.type},${p.servePhase||""},${p.causePlayer||""},${p.winner||""},${p.mark||""},${p.server},${p.stroke||""},${p.position||""},${p.result||""},${p.time}\n`;
   });
   return csv;
 }
@@ -381,9 +402,61 @@ function downloadCSV(){
 // ===== Undo =====
 function undo(){
   if(data.length===0) return;
+
   data.pop();
+
+  if(data.length===0){
+    location.reload();
+    return;
+  }
+
+  let last = data[data.length-1].snapshot;
+
+  match = JSON.parse(JSON.stringify(last.match));
+  server = last.server;
+  serveCount = last.serveCount;
+  servePhase = last.servePhase;
+
   localStorage.setItem("tennisData", JSON.stringify(data));
-  location.reload();
+
+  state="type";
+  render();
+  updateScore();
+}
+
+// ===== サーブ統計 =====
+function calcServeStats(){
+
+  let firstTotal=0, firstIn=0;
+  let secondTotal=0, secondIn=0;
+  let df=0;
+
+  data.forEach(d=>{
+    let p = d.point;
+    if(p.server!=="me") return;
+
+    if(p.type==="F"){
+      if(p.servePhase===1) firstTotal++;
+      else{
+        secondTotal++;
+        df++;
+      }
+    }else{
+      if(p.servePhase===1){
+        firstTotal++;
+        firstIn++;
+      }else{
+        secondTotal++;
+        secondIn++;
+      }
+    }
+  });
+
+  return {
+    firstRate: firstTotal ? (firstIn/firstTotal*100).toFixed(1) : 0,
+    secondRate: secondTotal ? (secondIn/secondTotal*100).toFixed(1) : 0,
+    dfRate: secondTotal ? (df/secondTotal*100).toFixed(1) : 0
+  };
 }
 
 // ===== 初期 =====

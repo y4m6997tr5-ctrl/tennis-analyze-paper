@@ -20,17 +20,22 @@ input { width: 80%; padding: 10px; margin: 5px; font-size: 16px; }
 
 <script>
 
-// ===== 基本 =====
-let info = { mySchool:"", oppSchool:"", myName:"", oppName:"", firstServer:"me" };
+// ===== 基本情報 =====
+let info = {
+  mySchool:"", oppSchool:"",
+  myName:"", oppName:"",
+  firstServer:"me"
+};
 
 let state="setup";
 let current={};
 let data=JSON.parse(localStorage.getItem("tennisData")||"[]");
 
+// ===== サーブ =====
 let server="me";
 let servePhase=1;
 
-// ★ゲーム内ポイント番号（CSV用）
+// ===== ゲーム内ポイント番号 =====
 let gamePointIndex=0;
 
 // ===== スコア =====
@@ -44,7 +49,9 @@ const pointMap=[0,15,30,40];
 
 // ===== プレイヤー表示 =====
 function label(p){
-  return p==="me" ? `${info.mySchool}/${info.myName}` : `${info.oppSchool}/${info.oppName}`;
+  return p==="me"
+    ? `${info.mySchool}/${info.myName}`
+    : `${info.oppSchool}/${info.oppName}`;
 }
 
 // ===== UI =====
@@ -66,7 +73,11 @@ function render(){
   }
 
   if(match.finished){
-    app.innerHTML=`<textarea style="width:95%;height:300px;">${generateCSV()}</textarea>`;
+    app.innerHTML=`
+      <h2>試合終了</h2>
+      <textarea style="width:95%;height:300px;">${generateCSV()}</textarea><br>
+      <button onclick="downloadCSV()">CSVダウンロード</button>
+    `;
     controls.innerHTML="";
     return;
   }
@@ -76,31 +87,26 @@ function render(){
       <button onclick="handleType('SA')">サービスエース</button>
       <button onclick="handleType('F')">フォルト</button>
       <button onclick="handleType('Rally')">ラリー</button>
-      <button onclick="undo()">戻る</button>
     `;
   }
-
   else if(state==="cause"){
     controls.innerHTML=`
       <button onclick="setCause('me')">${label("me")}</button>
       <button onclick="setCause('opponent')">${label("opponent")}</button>
     `;
   }
-
   else if(state==="rally1"){
     controls.innerHTML=`
       <button onclick="setDetail('side','F')">フォア</button>
       <button onclick="setDetail('side','B')">バック</button>
     `;
   }
-
   else if(state==="rally2"){
     controls.innerHTML=`
       <button onclick="setDetail('style','S')">ストローク</button>
       <button onclick="setDetail('style','V')">ボレー</button>
     `;
   }
-
   else if(state==="rally3"){
     controls.innerHTML=`
       <button onclick="setDetail('result','O')">アウト</button>
@@ -110,7 +116,7 @@ function render(){
   }
 
   app.innerHTML=`
-    <h3>${label(server)}</h3>
+    <h3>サーバー: ${label(server)}</h3>
     <p>${servePhase===1?"1st":"2nd"}</p>
   `;
 }
@@ -188,14 +194,14 @@ function save(actor,mark){
 
   gamePointIndex++;
 
-  let player=label(actor);
+  let player = label(actor || server);
 
   let actionType="";
 
   if(mark==="SA") actionType="SA";
   else if(mark==="WF") actionType="WF";
   else if(mark==="'") actionType="'";
-  else{
+  else if(current.detail){
     let d=current.detail;
     actionType=(servePhase===2?"'":"")+d.side+d.style+d.result;
   }
@@ -234,13 +240,16 @@ function gameWon(p){
   match.currentGame=[0,0];
   gamePointIndex=0;
 
+  // ★ここでサーブ交代
+  server = server==="me"?"opponent":"me";
+
   if(match.currentSet[p]>=6){
     match.finished=true;
     render();
   }
 }
 
-// ★ここ復活
+// ===== 表示 =====
 function getScore(){
   let p=match.currentGame;
 
@@ -269,12 +278,12 @@ function generateCSV(){
   return csv;
 }
 
-// ===== Undo =====
-function undo(){
-  if(data.length===0) return;
-  data.pop();
-  localStorage.setItem("tennisData",JSON.stringify(data));
-  location.reload();
+function downloadCSV(){
+  let blob=new Blob([generateCSV()],{type:"text/csv"});
+  let a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="tennis.csv";
+  a.click();
 }
 
 // ===== 初期 =====

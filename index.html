@@ -27,7 +27,7 @@ body { font-family: sans-serif; margin:0; }
   bottom: 0;
   width: 100%;
   background: #eee;
-  padding: 15px 0;
+  padding: 20px 0;
   text-align: center;
 }
 
@@ -69,7 +69,7 @@ let state = "setup";
 let current = {};
 let data = JSON.parse(localStorage.getItem("tennisData") || "[]");
 
-// ===== サーブ管理 =====
+// ===== サーブ =====
 let server = "me";
 let serveCount = 0;
 
@@ -93,7 +93,6 @@ function render(){
   const app = document.getElementById("app");
   const controls = document.getElementById("controls");
 
-  // ===== 初期入力 =====
   if(state==="setup"){
     app.innerHTML = `
       <h3>試合設定</h3>
@@ -109,14 +108,13 @@ function render(){
     return;
   }
 
-  // ===== 試合終了 =====
   if(match.finished){
     let csv = generateCSV();
 
     app.innerHTML = `
       <h2>試合終了</h2>
       <h3>${match.sets[0]} - ${match.sets[1]}</h3>
-      <textarea>${csv}</textarea>
+      <textarea style="width:95%;height:300px;">${csv}</textarea>
       <br>
       <button onclick="downloadCSV()">CSVダウンロード</button>
     `;
@@ -124,7 +122,6 @@ function render(){
     return;
   }
 
-  // ===== フロー =====
   if(state==="type"){
     controls.innerHTML = `
       <button onclick="handleType('SA')">SA</button>
@@ -133,10 +130,10 @@ function render(){
     `;
   }
 
-  else if(state==="winner"){
+  else if(state==="cause"){
     controls.innerHTML = `
-      <button onclick="setWinner('me')">自分</button>
-      <button onclick="setWinner('opponent')">相手</button>
+      <button onclick="setCause('me')">自分</button>
+      <button onclick="setCause('opponent')">相手</button>
     `;
   }
 
@@ -166,9 +163,7 @@ function render(){
 }
 
 // ===== 試合開始 =====
-function setFirstServer(s){
-  info.firstServer = s;
-}
+function setFirstServer(s){ info.firstServer = s; }
 
 function startMatch(){
   info.mySchool = document.getElementById("mySchool").value;
@@ -177,21 +172,16 @@ function startMatch(){
   info.oppName = document.getElementById("oppName").value;
 
   server = info.firstServer;
-  state = "type";
+  state="type";
   render();
 }
 
-// ===== タイプ選択 =====
+// ===== タイプ =====
 function handleType(t){
   current = { type:t };
 
-  // フォルト
-  if(t==="F"){
-    handleFault();
-    return;
-  }
+  if(t==="F"){ handleFault(); return; }
 
-  // エース
   if(t==="SA"){
     faultCount[server]=0;
     pointWon(server);
@@ -199,9 +189,8 @@ function handleType(t){
     return;
   }
 
-  // ラリー
   current.detail = {};
-  state="rally1";
+  state="cause";
   render();
 }
 
@@ -220,23 +209,37 @@ function handleFault(){
 }
 
 // ===== ラリー =====
+function setCause(p){
+  current.causePlayer = p;
+  state="rally1";
+  render();
+}
+
 function setDetail(k,v){
   current.detail[k]=v;
 
   if(state==="rally1") state="rally2";
   else if(state==="rally2") state="rally3";
   else{
-    state="winner";
-    render();
+    let winner = decidePoint(current.causePlayer, current.detail.result);
+    save(winner);
     return;
   }
 
   render();
 }
 
-function setWinner(w){
-  pointWon(w);
-  save(w);
+// ===== 得点判定 =====
+function decidePoint(p, result){
+  let opp = p==="me"?"opponent":"me";
+
+  if(result==="A"){
+    pointWon(p);
+    return p;
+  }else{
+    pointWon(opp);
+    return opp;
+  }
 }
 
 // ===== 保存 =====
@@ -250,7 +253,6 @@ function save(winner, mark=null){
   localStorage.setItem("tennisData", JSON.stringify(data));
 
   nextServe();
-
   state="type";
   render();
 }
@@ -342,9 +344,9 @@ function updateScore(){
 
 // ===== CSV =====
 function generateCSV(){
-  let csv="type,winner,mark,server,time\n";
+  let csv="type,causePlayer,winner,mark,server,time\n";
   data.forEach(d=>{
-    csv+=`${d.type},${d.winner||""},${d.mark||""},${d.server},${d.time}\n`;
+    csv+=`${d.type},${d.causePlayer||""},${d.winner||""},${d.mark||""},${d.server},${d.time}\n`;
   });
   return csv;
 }

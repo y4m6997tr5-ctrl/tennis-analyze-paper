@@ -20,26 +20,23 @@ input { width: 80%; padding: 10px; margin: 5px; font-size: 16px; }
 
 <script>
 
-// ===== 基本情報 =====
+// ===== 基本 =====
 let info = { mySchool:"", oppSchool:"", myName:"", oppName:"", firstServer:"me" };
 
 let state="setup";
 let current={};
 let data=JSON.parse(localStorage.getItem("tennisData")||"[]");
 
-// ===== サーブ =====
 let server="me";
 let servePhase=1;
 
-// ===== ★ゲーム内ポイント番号 =====
-let gamePointIndex = 0;
+// ★ゲーム内ポイント番号（CSV用）
+let gamePointIndex=0;
 
-// ===== スコア（1セット） =====
+// ===== スコア =====
 let match = {
   currentSet:[0,0],
   currentGame:[0,0],
-  tiebreak:false,
-  tiebreakPoints:[0,0],
   finished:false
 };
 
@@ -115,7 +112,6 @@ function render(){
   app.innerHTML=`
     <h3>${label(server)}</h3>
     <p>${servePhase===1?"1st":"2nd"}</p>
-    <p>ポイント:${gamePointIndex+1}</p>
   `;
 }
 
@@ -172,7 +168,7 @@ function setDetail(k,v){
   if(state==="rally1") state="rally2";
   else if(state==="rally2") state="rally3";
   else{
-    let winner=decide(current.causePlayer,current.detail.result);
+    decide(current.causePlayer,current.detail.result);
     save(current.causePlayer,null);
     return;
   }
@@ -183,8 +179,8 @@ function setDetail(k,v){
 // ===== 判定 =====
 function decide(p,r){
   let opp=p==="me"?"opponent":"me";
-  if(r==="A"){ pointWon(p); return p; }
-  else{ pointWon(opp); return opp; }
+  if(r==="A") pointWon(p);
+  else pointWon(opp);
 }
 
 // ===== 保存 =====
@@ -225,6 +221,7 @@ function pointWon(player){
   let o=p===0?1:0;
 
   match.currentGame[p]++;
+
   if(match.currentGame[p]>=4 && match.currentGame[p]-match.currentGame[o]>=2){
     gameWon(p);
   }
@@ -235,13 +232,32 @@ function pointWon(player){
 function gameWon(p){
   match.currentSet[p]++;
   match.currentGame=[0,0];
-
-  gamePointIndex=0; // ★リセット
+  gamePointIndex=0;
 
   if(match.currentSet[p]>=6){
     match.finished=true;
     render();
   }
+}
+
+// ★ここ復活
+function getScore(){
+  let p=match.currentGame;
+
+  if(p[0]>=3 && p[1]>=3){
+    if(p[0]===p[1]) return "デュース";
+    return p[0]>p[1] ? "Ad 自分" : "Ad 相手";
+  }
+
+  return `${pointMap[p[0]]}-${pointMap[p[1]]}`;
+}
+
+function updateScore(){
+  document.getElementById("score").innerHTML=`
+  ${info.myName} vs ${info.oppName}<br>
+  ゲーム ${match.currentSet[0]}-${match.currentSet[1]} |
+  ポイント ${getScore()}
+  `;
 }
 
 // ===== CSV =====
@@ -259,13 +275,6 @@ function undo(){
   data.pop();
   localStorage.setItem("tennisData",JSON.stringify(data));
   location.reload();
-}
-
-// ===== 表示 =====
-function updateScore(){
-  document.getElementById("score").innerHTML=
-  `${info.myName} vs ${info.oppName}<br>
-  ゲーム ${match.currentSet[0]}-${match.currentSet[1]}`;
 }
 
 // ===== 初期 =====

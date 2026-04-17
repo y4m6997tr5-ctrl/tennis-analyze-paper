@@ -4,10 +4,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body { font-family: sans-serif; margin:0; }
-#score { position: fixed; top:0; width:100%; background:black; color:white; padding:12px; text-align:center;}
-#app { padding-top:110px; padding-bottom:180px; text-align:center;}
-#controls { position:fixed; bottom:0; width:100%; background:#eee; padding:15px 0;}
-button { width:80%; padding:16px; margin:6px;}
+
+#score {
+  position: fixed;
+  top:0;
+  width:100%;
+  background:black;
+  color:white;
+  padding:12px;
+  text-align:center;
+}
+
+#app {
+  padding-top:120px;
+  padding-bottom:180px;
+  text-align:center;
+}
+
+/* ★中央配置修正 */
+#controls {
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:#eee;
+  padding:15px 0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+button {
+  width:80%;
+  padding:16px;
+  margin:6px;
+  font-size:16px;
+}
 </style>
 </head>
 
@@ -81,7 +112,12 @@ function render(){
     <button onclick="handleType('Rally')">Rally</button>`;
   }
 
-  app.innerHTML=`<h3>${label(server)}</h3><p>${tiebreak?"TB":servePhase+"st"}</p>`;
+  // ★ゲーム数をここにも表示（消えないように）
+  app.innerHTML=`
+    <h3>${label(server)}</h3>
+    <p>ゲーム ${match.currentSet[0]}-${match.currentSet[1]}</p>
+    <p>${tiebreak?"TB":servePhase+"st"}</p>
+  `;
 }
 
 // ===== 開始 =====
@@ -95,16 +131,12 @@ function startMatch(){
   state="type";render();
 }
 
-// ===== 統計更新 =====
+// ===== 統計関数 =====
 function updateStatsOnServeStart(p){
   if(servePhase===1) stats[p].firstServeAttempt++;
 }
-function updateStatsOnFirstIn(p){
-  stats[p].firstServeIn++;
-}
-function updateStatsOnPointEnd(p){
-  stats[p].servePoint++;
-}
+function updateStatsOnFirstIn(p){ stats[p].firstServeIn++; }
+function updateStatsOnPointEnd(p){ stats[p].servePoint++; }
 function updateStatsOnDF(p){
   stats[p].doubleFault++;
   stats[p].servePoint++;
@@ -115,7 +147,6 @@ function handleType(t){
 
   current={type:t,servePhase};
 
-  // SA
   if(t==="SA"){
     updateStatsOnServeStart(server);
     updateStatsOnFirstIn(server);
@@ -126,10 +157,8 @@ function handleType(t){
     return;
   }
 
-  // F
   if(t==="F"){handleFault();return;}
 
-  // ラリー
   updateStatsOnServeStart(server);
   if(servePhase===1) updateStatsOnFirstIn(server);
 
@@ -153,13 +182,6 @@ function handleFault(){
   let opp=switchPlayer(server);
   pointWon(opp);
   save(server,"WF");
-}
-
-// ===== 判定 =====
-function decide(p,r){
-  let opp=switchPlayer(p);
-  if(r==="A") pointWon(p);
-  else pointWon(opp);
 }
 
 // ===== 得点 =====
@@ -241,7 +263,7 @@ function getScore(){
 }
 
 function updateScore(){
-  score.innerHTML=`
+  document.getElementById("score").innerHTML=`
   ${info.myName} vs ${info.oppName}<br>
   ゲーム ${match.currentSet[0]}-${match.currentSet[1]} |
   ポイント ${getScore()}<br>
@@ -254,22 +276,11 @@ function save(actor,mark){
 
   gamePointIndex++;
 
-  let actionType="";
-  if(mark==="SA") actionType="SA";
-  else if(mark==="WF") actionType="WF";
-  else if(mark==="'") actionType="'";
-  else{
-    let d=current.detail;
-    actionType=(servePhase===2?"'":"")+d.side+d.style+d.result;
-  }
-
   data.push({
     player:label(actor),
     gameNumber,
     actionIndex:gamePointIndex,
-    actionType,
-    server:label(server),
-    firstRate:rate(stats[server]),
+    actionType:mark||"",
     time:new Date().toISOString()
   });
 
@@ -281,9 +292,9 @@ function save(actor,mark){
 
 // ===== CSV =====
 function generateCSV(){
-  let csv="player,game,actionIndex,actionType,server,serveRate,time\n";
+  let csv="player,game,actionIndex,actionType,time\n";
   data.forEach(d=>{
-    csv+=`${d.player},${d.gameNumber},${d.actionIndex},${d.actionType},${d.server},${d.firstRate},${d.time}\n`;
+    csv+=`${d.player},${d.gameNumber},${d.actionIndex},${d.actionType},${d.time}\n`;
   });
   return csv;
 }

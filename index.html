@@ -38,6 +38,18 @@ button {
   margin:6px;
   font-size:16px;
 }
+
+table {
+  border-collapse: collapse;
+  width:100%;
+  font-size:12px;
+}
+
+td, th {
+  border:1px solid black;
+  padding:4px;
+  text-align:center;
+}
 </style>
 </head>
 
@@ -59,7 +71,7 @@ let servePhase=1;
 let gamePointIndex=0;
 let gameNumber=1;
 
-// ===== 統計（自分・相手） =====
+// ===== 統計 =====
 let stats={
   me:{firstServeAttempt:0,firstServeIn:0,doubleFault:0,servePoint:0},
   opponent:{firstServeAttempt:0,firstServeIn:0,doubleFault:0,servePoint:0}
@@ -83,6 +95,13 @@ function label(p){
     : `${info.oppSchool}/${info.oppName}`;
 }
 
+// ===== 丸数字 =====
+function toCircle(n){
+  const nums=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩",
+              "⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"];
+  return nums[n-1]||n;
+}
+
 // ===== UI =====
 function render(){
   const app=document.getElementById("app");
@@ -102,10 +121,8 @@ function render(){
   }
 
   if(match.finished){
-    app.innerHTML=`
-      <h2>試合終了</h2>
-      <textarea style="width:95%;height:300px;">${generateCSV()}</textarea>
-    `;
+    buildSheet();
+    app.innerHTML = renderSheet();
     controls.innerHTML="";
     return;
   }
@@ -150,7 +167,7 @@ function render(){
   `;
 }
 
-// ===== 試合開始 =====
+// ===== 開始 =====
 function setFirstServer(s){ info.firstServer=s; }
 function startMatch(){
   info.mySchool=mySchool.value;
@@ -162,16 +179,11 @@ function startMatch(){
   render();
 }
 
-// ===== 統計更新 =====
-function serveStart(p){
-  if(servePhase===1) stats[p].firstServeAttempt++;
-}
+// ===== 統計 =====
+function serveStart(p){ if(servePhase===1) stats[p].firstServeAttempt++; }
 function firstIn(p){ stats[p].firstServeIn++; }
 function pointEnd(p){ stats[p].servePoint++; }
-function doubleFault(p){
-  stats[p].doubleFault++;
-  stats[p].servePoint++;
-}
+function doubleFault(p){ stats[p].doubleFault++; stats[p].servePoint++; }
 
 // ===== 入力 =====
 function handleType(t){
@@ -182,7 +194,6 @@ function handleType(t){
     serveStart(server);
     firstIn(server);
     pointEnd(server);
-
     pointWon(server);
     save(server,"SA");
     return;
@@ -190,7 +201,6 @@ function handleType(t){
 
   if(t==="F"){ handleFault(); return; }
 
-  // ラリー開始
   serveStart(server);
   if(servePhase===1) firstIn(server);
 
@@ -201,7 +211,6 @@ function handleType(t){
 
 // ===== フォルト =====
 function handleFault(){
-
   if(!tiebreak && servePhase===1){
     serveStart(server);
     servePhase=2;
@@ -225,9 +234,7 @@ function setDetail(k,v){
   else if(state==="rally2") state="rally3";
   else{
     let winner = decide(current.causePlayer,current.detail.result);
-
     pointEnd(server);
-
     save(winner,null);
     return;
   }
@@ -276,8 +283,6 @@ function pointWon(p){
 // ===== ゲーム =====
 function gameWon(p){
 
-  let o=p===0?1:0;
-
   match.currentSet[p]++;
   match.currentGame=[0,0];
   gamePointIndex=0;
@@ -293,7 +298,7 @@ function gameWon(p){
     return;
   }
 
-  if(match.currentSet[p]>=6 && match.currentSet[p]-match.currentSet[o]>=2){
+  if(match.currentSet[p]>=6 && Math.abs(match.currentSet[0]-match.currentSet[1])>=2){
     match.finished=true;
   }
 
@@ -309,19 +314,16 @@ function rate(s){
 
 function getScore(){
   if(tiebreak) return `${tbPoints[0]}-${tbPoints[1]}`;
-
   let p=match.currentGame;
-
   if(p[0]>=3 && p[1]>=3){
     if(p[0]===p[1]) return "デュース";
     return p[0]>p[1]?"Ad 自分":"Ad 相手";
   }
-
   return `${pointMap[p[0]]}-${pointMap[p[1]]}`;
 }
 
 function updateScore(){
-  document.getElementById("score").innerHTML=`
+  score.innerHTML=`
   ${info.myName} vs ${info.oppName}<br>
   ゲーム ${match.currentSet[0]}-${match.currentSet[1]} |
   ポイント ${getScore()}<br>
@@ -341,9 +343,7 @@ function save(actor,mark){
   else if(mark==="'") actionType="'";
   else{
     let d=current.detail;
-    actionType =
-      (current.servePhase===2?"'":"") +
-      d.side + d.style + d.result;
+    actionType=(current.servePhase===2?"'":"")+d.side+d.style+d.result;
   }
 
   data.push({
@@ -362,13 +362,80 @@ function save(actor,mark){
   render();
 }
 
-// ===== CSV =====
-function generateCSV(){
-  let csv="player,game,actionIndex,actionType,server,serveRate,time\n";
+// ===== シート作成 =====
+let sheet={};
+
+function buildSheet(){
+
+  sheet={};
+
   data.forEach(d=>{
-    csv+=`${d.player},${d.gameNumber},${d.actionIndex},${d.actionType},${d.server},${d.serveRate},${d.time}\n`;
+
+    if(!sheet[d.gameNumber]){
+      sheet[d.gameNumber]={
+        meP:[], meM:[],
+        opP:[], opM:[],
+        first:"", wf:""
+      };
+    }
+
+    let r=sheet[d.gameNumber];
+    let text=toCircle(d.actionIndex)+d.actionType;
+    let isMe=d.player.includes(info.myName);
+
+    if(d.actionType==="SA"||d.actionType.includes("A")){
+      isMe ? r.meP.push(text) : r.opP.push(text);
+    }
+    else if(d.actionType==="WF"||d.actionType.includes("N")||d.actionType.includes("O")){
+      isMe ? r.meM.push(text) : r.opM.push(text);
+    }
+
+    if(d.server.includes(info.myName)){
+      let sp=d.serveRate.split(" / ");
+      r.first=sp[0];
+      r.wf=sp[1];
+    }
+
   });
-  return csv;
+}
+
+// ===== シート表示 =====
+function renderSheet(){
+
+  let html=`
+  <table>
+  <tr>
+    <th>ゲーム</th>
+    <th colspan="2">${info.mySchool}<br>${info.myName}</th>
+    <th colspan="2">${info.oppSchool}<br>${info.oppName}</th>
+    <th>1st</th>
+    <th>WF</th>
+  </tr>
+  <tr>
+    <th></th>
+    <th>P</th><th>M</th>
+    <th>P</th><th>M</th>
+    <th></th><th></th>
+  </tr>
+  `;
+
+  Object.keys(sheet).forEach(g=>{
+    let r=sheet[g];
+    html+=`
+    <tr>
+      <td>${g}</td>
+      <td>${r.meP.join(" ")}</td>
+      <td>${r.meM.join(" ")}</td>
+      <td>${r.opP.join(" ")}</td>
+      <td>${r.opM.join(" ")}</td>
+      <td>${r.first}</td>
+      <td>${r.wf}</td>
+    </tr>
+    `;
+  });
+
+  html+="</table>";
+  return html;
 }
 
 // ===== 初期 =====

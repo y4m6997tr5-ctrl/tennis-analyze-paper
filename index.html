@@ -71,6 +71,13 @@ let firstFaultFlag=false;
 let gamePointIndex=0;
 let gameNumber=1;
 
+let pendingGameWinner=null;
+
+// ===== タイブレーク =====
+let tiebreak=false;
+let tbPoints=[0,0];
+let tbServeCount=0;
+
 // ===== スコア =====
 let match={currentSet:[0,0],currentGame:[0,0],finished:false};
 
@@ -84,7 +91,6 @@ function label(p){
     : `${info.oppSchool}/${info.oppName}`;
 }
 
-// ===== 丸数字 =====
 function toCircle(n){
   const nums=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩",
               "⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"];
@@ -170,7 +176,6 @@ function startMatch(){
 
 // ===== 入力 =====
 function handleType(t){
-
   current={type:t};
 
   if(t==="SA"){
@@ -188,7 +193,6 @@ function handleType(t){
 
 // ===== フォルト =====
 function handleFault(){
-
   if(servePhase===1){
     servePhase=2;
     firstFaultFlag=true;
@@ -227,12 +231,32 @@ function decide(p,r){
 
 // ===== 得点 =====
 function pointWon(p){
+
   let i=p==="me"?0:1;
   let o=i===0?1:0;
 
+  if(tiebreak){
+    tbPoints[i]++;
+
+    // サーブ回転
+    tbServeCount++;
+    if(tbServeCount===1 || tbServeCount%2===1){
+      server = switchPlayer(server);
+    }
+
+    if(tbPoints[i]>=7 && tbPoints[i]-tbPoints[o]>=2){
+      match.currentSet[i]++;
+      match.finished=true;
+    }
+
+    updateScore();
+    return;
+  }
+
   match.currentGame[i]++;
+
   if(match.currentGame[i]>=4 && match.currentGame[i]-match.currentGame[o]>=2){
-    gameWon(i);
+    pendingGameWinner=i;
   }
 
   updateScore();
@@ -240,19 +264,33 @@ function pointWon(p){
 
 // ===== ゲーム =====
 function gameWon(p){
+
   match.currentSet[p]++;
   match.currentGame=[0,0];
   gamePointIndex=0;
   gameNumber++;
+
   server=switchPlayer(server);
+
+  if(match.currentSet[0]===6 && match.currentSet[1]===6){
+    tiebreak=true;
+    tbPoints=[0,0];
+    tbServeCount=0;
+    return;
+  }
 
   if(match.currentSet[p]>=6){
     match.finished=true;
   }
 }
 
-// ===== ★修正：デュース対応 =====
+// ===== 表示 =====
 function getScore(){
+
+  if(tiebreak){
+    return `${tbPoints[0]}-${tbPoints[1]}`;
+  }
+
   let p = match.currentGame;
 
   if(p[0] >= 3 && p[1] >= 3){
@@ -299,6 +337,11 @@ function save(actor,mark){
     server:label(server)
   });
 
+  if(pendingGameWinner!==null){
+    gameWon(pendingGameWinner);
+    pendingGameWinner=null;
+  }
+
   servePhase=1;
   state="type";
   render();
@@ -308,15 +351,11 @@ function save(actor,mark){
 let sheet={};
 
 function buildSheet(){
-
   sheet={};
-
   data.forEach(d=>{
-
     if(!sheet[d.gameNumber]){
       sheet[d.gameNumber]={meP:[],meM:[],opP:[],opM:[]};
     }
-
     let r=sheet[d.gameNumber];
     let text=toCircle(d.actionIndex)+d.actionType;
     let isMe=d.player.includes(info.myName);
@@ -334,7 +373,6 @@ function buildSheet(){
     else{
       isMe ? r.meM.push(text) : r.opM.push(text);
     }
-
   });
 }
 

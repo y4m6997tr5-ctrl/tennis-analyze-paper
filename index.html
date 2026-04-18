@@ -116,7 +116,6 @@ function render(){
     return;
   }
 
-  // ★ 修正①：状態遷移UIを完全復元
   if(state==="type"){
     controls.innerHTML=`
       <button onclick="handleType('SA')">サービスエース</button>
@@ -193,9 +192,7 @@ function handleFault(){
   if(servePhase===1){
     servePhase=2;
     firstFaultFlag=true;
-
-    render(); // ★ 修正②：ここで再描画
-
+    render();
     return;
   }
 
@@ -254,9 +251,16 @@ function gameWon(p){
   }
 }
 
-// ===== 表示 =====
+// ===== ★修正：デュース対応 =====
 function getScore(){
-  let p=match.currentGame;
+  let p = match.currentGame;
+
+  if(p[0] >= 3 && p[1] >= 3){
+    if(p[0] === p[1]) return "デュース";
+    if(p[0] > p[1]) return "Ad 自分";
+    return "Ad 相手";
+  }
+
   return `${pointMap[p[0]]}-${pointMap[p[1]]}`;
 }
 

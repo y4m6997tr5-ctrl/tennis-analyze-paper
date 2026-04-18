@@ -66,29 +66,17 @@ let state="setup",current={},data=[];
 
 let server="me";
 let servePhase=1;
-
-// ★追加：フォルトフラグ
 let firstFaultFlag=false;
 
 let gamePointIndex=0;
 let gameNumber=1;
 
-// ===== 統計 =====
-let stats={
-  me:{firstServeAttempt:0,firstServeIn:0,doubleFault:0,servePoint:0},
-  opponent:{firstServeAttempt:0,firstServeIn:0,doubleFault:0,servePoint:0}
-};
-
 // ===== スコア =====
 let match={currentSet:[0,0],currentGame:[0,0],finished:false};
 
-// ===== TB =====
-let tiebreak=false;
-let tbPoints=[0,0];
-let tbCount=0;
-
 const pointMap=[0,15,30,40];
 
+// ===== 共通 =====
 function switchPlayer(p){ return p==="me"?"opponent":"me"; }
 function label(p){
   return p==="me"
@@ -128,11 +116,37 @@ function render(){
     return;
   }
 
+  // ★ 修正①：状態遷移UIを完全復元
   if(state==="type"){
     controls.innerHTML=`
       <button onclick="handleType('SA')">サービスエース</button>
       <button onclick="handleType('F')">フォルト</button>
       <button onclick="handleType('Rally')">ラリー</button>
+    `;
+  }
+  else if(state==="cause"){
+    controls.innerHTML=`
+      <button onclick="setCause('me')">${label("me")}</button>
+      <button onclick="setCause('opponent')">${label("opponent")}</button>
+    `;
+  }
+  else if(state==="rally1"){
+    controls.innerHTML=`
+      <button onclick="setDetail('side','F')">フォア</button>
+      <button onclick="setDetail('side','B')">バック</button>
+    `;
+  }
+  else if(state==="rally2"){
+    controls.innerHTML=`
+      <button onclick="setDetail('style','S')">ストローク</button>
+      <button onclick="setDetail('style','V')">ボレー</button>
+    `;
+  }
+  else if(state==="rally3"){
+    controls.innerHTML=`
+      <button onclick="setDetail('result','O')">アウト</button>
+      <button onclick="setDetail('result','N')">ネット</button>
+      <button onclick="setDetail('result','A')">エース</button>
     `;
   }
 
@@ -143,7 +157,7 @@ function render(){
   `;
 }
 
-// ===== 試合開始 =====
+// ===== 開始 =====
 function setFirstServer(s){ info.firstServer=s; }
 function startMatch(){
   info.mySchool=mySchool.value;
@@ -179,10 +193,12 @@ function handleFault(){
   if(servePhase===1){
     servePhase=2;
     firstFaultFlag=true;
+
+    render(); // ★ 修正②：ここで再描画
+
     return;
   }
 
-  // ダブルフォルト
   let opp=switchPlayer(server);
   pointWon(opp);
   save(server,"WF");
@@ -266,9 +282,8 @@ function save(actor,mark){
     actionType=d.side+d.style+d.result;
   }
 
-  // ★フォルト付与
   if(firstFaultFlag){
-    actionType = "'" + actionType;
+    actionType="'"+actionType;
     firstFaultFlag=false;
   }
 
@@ -337,7 +352,8 @@ function renderSheet(){
 }
 
 // ===== 初期 =====
-render();updateScore();
+render();
+updateScore();
 
 </script>
 </body>

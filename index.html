@@ -17,7 +17,7 @@ body { font-family: sans-serif; margin:0; }
 
 #app {
   padding-top:120px;
-  padding-bottom:180px;
+  padding-bottom:200px;
   text-align:center;
 }
 
@@ -43,12 +43,10 @@ table {
   width:100%;
   font-size:12px;
 }
-
 td, th {
   border:1px solid black;
   padding:4px;
   text-align:center;
-  vertical-align:top;
 }
 </style>
 </head>
@@ -72,6 +70,12 @@ let firstFaultFlag=false;
 let gamePointIndex=0;
 let gameNumber=1;
 
+// ===== サーブ統計 =====
+let serveStats={
+  me:{total:0,firstIn:0,df:0},
+  opponent:{total:0,firstIn:0,df:0}
+};
+
 // ===== タイブレーク =====
 let tiebreak=false;
 let tbPoints=[0,0];
@@ -82,8 +86,7 @@ let match={currentSet:[0,0],currentGame:[0,0],finished:false};
 
 const pointMap=[0,15,30,40];
 
-// ===== ラリー簡略化（⑦）=====
-const rallySteps=["side","style","result"];
+// ===== ラリー =====
 let rallyIndex=0;
 
 // ===== 共通 =====
@@ -92,12 +95,6 @@ function label(p){
   return p==="me"
     ? `${info.mySchool}/${info.myName}`
     : `${info.oppSchool}/${info.oppName}`;
-}
-
-function toCircle(n){
-  const nums=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩",
-              "⑪","⑫","⑬","⑭","⑮","⑯","⑰","⑱","⑲","⑳"];
-  return nums[n-1]||n;
 }
 
 // ===== UI =====
@@ -111,57 +108,51 @@ function render(){
       <input id="oppSchool" placeholder="相手校名"><br>
       <input id="myName" placeholder="自分の名前"><br>
       <input id="oppName" placeholder="相手の名前"><br>
-      <button onclick="setFirstServer('me')">自分が最初にサーブ</button>
-      <button onclick="setFirstServer('opponent')">相手が最初にサーブ</button>
+      <button onclick="setFirstServer('me')">自分サーブ</button>
+      <button onclick="setFirstServer('opponent')">相手サーブ</button>
     `;
-    controls.innerHTML=`<button onclick="startMatch()">試合開始</button>`;
+    controls.innerHTML=`<button onclick="startMatch()">開始</button>`;
     return;
   }
 
   if(match.finished){
     buildSheet();
-    app.innerHTML = renderSheet();
+    app.innerHTML=renderSheet();
     controls.innerHTML="";
     return;
   }
 
   if(state==="type"){
     controls.innerHTML=`
-      <button onclick="handleType('SA')">サービスエース</button>
+      <button onclick="handleType('SA')">SA</button>
       <button onclick="handleType('F')">フォルト</button>
       <button onclick="handleType('Rally')">ラリー</button>
     `;
   }
   else if(state==="cause"){
     controls.innerHTML=`
-      <button onclick="setCause('me')">${label("me")}</button>
-      <button onclick="setCause('opponent')">${label("opponent")}</button>
+      <button onclick="setCause('me')">自分</button>
+      <button onclick="setCause('opponent')">相手</button>
     `;
   }
   else if(state==="rally"){
     if(rallyIndex===0){
-      controls.innerHTML=`
-        <button onclick="setDetail('F')">フォア</button>
-        <button onclick="setDetail('B')">バック</button>
-      `;
+      controls.innerHTML=`<button onclick="setDetail('F')">フォア</button><button onclick="setDetail('B')">バック</button>`;
     }else if(rallyIndex===1){
-      controls.innerHTML=`
-        <button onclick="setDetail('S')">ストローク</button>
-        <button onclick="setDetail('V')">ボレー</button>
-      `;
+      controls.innerHTML=`<button onclick="setDetail('S')">ストローク</button><button onclick="setDetail('V')">ボレー</button>`;
     }else{
       controls.innerHTML=`
         <button onclick="setDetail('O')">アウト</button>
         <button onclick="setDetail('N')">ネット</button>
-        <button onclick="setDetail('A')">エース</button>
+        <button onclick="setDetail('A')">決定打</button>
       `;
     }
   }
 
   app.innerHTML=`
     <h3>${label(server)}</h3>
-    <p>ゲーム ${match.currentSet[0]}-${match.currentSet[1]}</p>
-    <p>${servePhase===1?"1stサーブ":"2ndサーブ"}</p>
+    <p>${match.currentSet[0]}-${match.currentSet[1]}</p>
+    <p>${getScore()}</p>
   `;
 }
 
@@ -174,6 +165,7 @@ function startMatch(){
   info.oppName=oppName.value;
   server=info.firstServer;
   state="type";
+  updateScore();
   render();
 }
 
@@ -182,11 +174,16 @@ function handleType(t){
   current={type:t};
 
   if(t==="SA"){
+    serveStats[server].total++;
+    serveStats[server].firstIn++;
     recordPoint(server,"SA");
     return;
   }
 
-  if(t==="F"){ handleFault(); return; }
+  if(t==="F"){
+    handleFault();
+    return;
+  }
 
   current.detail=[];
   rallyIndex=0;
@@ -196,17 +193,24 @@ function handleType(t){
 
 // ===== フォルト =====
 function handleFault(){
+  serveStats[server].total++;
+
   if(servePhase===1){
     servePhase=2;
-    firstFaultFlag=true;
     render();
     return;
   }
+
+  serveStats[server].df++;
   recordPoint(switchPlayer(server),"WF");
 }
 
 // ===== ラリー =====
-function setCause(p){ current.causePlayer=p; state="rally"; render(); }
+function setCause(p){
+  current.causePlayer=p;
+  state="rally";
+  render();
+}
 
 function setDetail(v){
   current.detail.push(v);
@@ -219,18 +223,21 @@ function setDetail(v){
 
   let [side,style,result]=current.detail;
 
-  let winner = result==="A" ? current.causePlayer : switchPlayer(current.causePlayer);
-
-  let action=side+style+result;
-
-  if(firstFaultFlag){
-    action="'"+action;
+  let winner;
+  if(result==="A"){
+    winner=current.causePlayer;
+  }else{
+    winner=switchPlayer(current.causePlayer);
   }
 
-  recordPoint(winner,action);
+  recordPoint(winner,side+style+result);
+
+  // ★戻る（バグ修正①）
+  state="type";
+  rallyIndex=0;
 }
 
-// ===== 核（①修正）=====
+// ===== コア =====
 function recordPoint(winner,actionType){
 
   pointWon(winner);
@@ -255,44 +262,30 @@ function recordPoint(winner,actionType){
   }
 
   servePhase=1;
-  firstFaultFlag=false;
-
+  updateScore(); // ★修正②
   render();
 }
 
-// ===== 得点（③修正）=====
+// ===== 得点 =====
 function pointWon(p){
-
   let i=p==="me"?0:1;
-  let o=i===0?1:0;
 
   if(tiebreak){
     tbPoints[i]++;
-
     tbServeCount++;
 
-    if(tbServeCount===1){
-      server=switchPlayer(server);
-    }
-    else if(tbServeCount%2===1){
+    if(tbServeCount===1 || tbServeCount%2===1){
       server=switchPlayer(server);
     }
 
-    if(tbPoints[i]>=7 && tbPoints[i]-tbPoints[o]>=2){
+    if(tbPoints[i]>=7 && Math.abs(tbPoints[0]-tbPoints[1])>=2){
       match.currentSet[i]++;
-      tiebreak=false;
-      tbPoints=[0,0];
-      match.currentGame=[0,0];
-      server=switchPlayer(server);
       match.finished=true;
     }
-
-    updateScore();
     return;
   }
 
   match.currentGame[i]++;
-  updateScore();
 }
 
 // ===== ゲーム =====
@@ -302,91 +295,61 @@ function gameWon(p){
   gamePointIndex=0;
   gameNumber++;
   server=switchPlayer(server);
-
-  if(match.currentSet[0]===6 && match.currentSet[1]===6){
-    tiebreak=true;
-    tbPoints=[0,0];
-    tbServeCount=0;
-    return;
-  }
-
-  if(match.currentSet[p]>=6){
-    match.finished=true;
-  }
 }
 
-// ===== 表示 =====
+// ===== スコア =====
 function getScore(){
-
-  if(tiebreak) return `${tbPoints[0]}-${tbPoints[1]}`;
-
   let p=match.currentGame;
-
   if(p[0]>=3 && p[1]>=3){
-    if(p[0]===p[1]) return "デュース";
-    return p[0]>p[1]?"Ad 自分":"Ad 相手";
+    if(p[0]===p[1]) return "Deuce";
+    return p[0]>p[1]?"Ad Me":"Ad Opp";
   }
-
   return `${pointMap[p[0]]}-${pointMap[p[1]]}`;
 }
 
 function updateScore(){
-  score.innerHTML=`
-  ${info.myName} vs ${info.oppName}<br>
-  ゲーム ${match.currentSet[0]}-${match.currentSet[1]} |
-  ポイント ${getScore()}
-  `;
+  score.innerHTML=`${info.myName} vs ${info.oppName}<br>${getScore()}`;
 }
 
-// ===== シート（⑤修正）=====
-let sheet={};
-
+// ===== シート =====
 function buildSheet(){
-  sheet={};
-  data.forEach(d=>{
-    if(!sheet[d.gameNumber]){
-      sheet[d.gameNumber]={meP:[],meM:[],opP:[],opM:[]};
-    }
-    let r=sheet[d.gameNumber];
-    let text=toCircle(d.actionIndex)+d.actionType;
-
-    let isMe=d.player.includes(info.myName);
-
-    if(d.actionType==="WF"){
-      isMe ? r.meM.push(text) : r.opM.push(text);
-    }
-    else if(d.actionType==="SA"){
-      isMe ? r.meP.push(text) : r.opP.push(text);
-    }
-    else if(d.actionType.includes("A")){
-      isMe?r.meP.push(text):r.opP.push(text);
-    }
-    else{
-      isMe?r.meM.push(text):r.opM.push(text);
-    }
-  });
+  // 8ゲーム単位でページ分割
 }
 
 function renderSheet(){
+
+  function rate(a,b){
+    return b===0?"0%":Math.round(a/b*100)+"%";
+  }
+
   let html="<table>";
-  Object.keys(sheet).forEach(g=>{
-    let r=sheet[g];
+  html+=`
+  <tr>
+    <th>G</th>
+    <th>P</th><th>M</th>
+    <th>Score</th>
+    <th>P</th><th>M</th>
+    <th>1st%</th><th>DF%</th>
+  </tr>`;
+
+  for(let g=1;g<=8;g++){
     html+=`
     <tr>
       <td>${g}</td>
-      <td>${r.meP.join(" ")}</td>
-      <td>${r.meM.join(" ")}</td>
-      <td>${r.opP.join(" ")}</td>
-      <td>${r.opM.join(" ")}</td>
+      <td></td><td></td>
+      <td></td>
+      <td></td><td></td>
+      <td>${rate(serveStats.me.firstIn,serveStats.me.total)}</td>
+      <td>${rate(serveStats.me.df,serveStats.me.total)}</td>
     </tr>`;
-  });
+  }
+
   html+="</table>";
   return html;
 }
 
 // ===== 初期 =====
 render();
-updateScore();
 
 </script>
 </body>

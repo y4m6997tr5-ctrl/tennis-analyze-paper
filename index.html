@@ -82,6 +82,10 @@ let match={currentSet:[0,0],currentGame:[0,0],finished:false};
 
 const pointMap=[0,15,30,40];
 
+// ===== ラリー簡略化（⑦）=====
+const rallySteps=["side","style","result"];
+let rallyIndex=0;
+
 // ===== 共通 =====
 function switchPlayer(p){ return p==="me"?"opponent":"me"; }
 function label(p){
@@ -134,24 +138,24 @@ function render(){
       <button onclick="setCause('opponent')">${label("opponent")}</button>
     `;
   }
-  else if(state==="rally1"){
-    controls.innerHTML=`
-      <button onclick="setDetail('side','F')">フォア</button>
-      <button onclick="setDetail('side','B')">バック</button>
-    `;
-  }
-  else if(state==="rally2"){
-    controls.innerHTML=`
-      <button onclick="setDetail('style','S')">ストローク</button>
-      <button onclick="setDetail('style','V')">ボレー</button>
-    `;
-  }
-  else if(state==="rally3"){
-    controls.innerHTML=`
-      <button onclick="setDetail('result','O')">アウト</button>
-      <button onclick="setDetail('result','N')">ネット</button>
-      <button onclick="setDetail('result','A')">エース</button>
-    `;
+  else if(state==="rally"){
+    if(rallyIndex===0){
+      controls.innerHTML=`
+        <button onclick="setDetail('F')">フォア</button>
+        <button onclick="setDetail('B')">バック</button>
+      `;
+    }else if(rallyIndex===1){
+      controls.innerHTML=`
+        <button onclick="setDetail('S')">ストローク</button>
+        <button onclick="setDetail('V')">ボレー</button>
+      `;
+    }else{
+      controls.innerHTML=`
+        <button onclick="setDetail('O')">アウト</button>
+        <button onclick="setDetail('N')">ネット</button>
+        <button onclick="setDetail('A')">エース</button>
+      `;
+    }
   }
 
   app.innerHTML=`
@@ -184,7 +188,8 @@ function handleType(t){
 
   if(t==="F"){ handleFault(); return; }
 
-  current.detail={};
+  current.detail=[];
+  rallyIndex=0;
   state="cause";
   render();
 }
@@ -201,38 +206,33 @@ function handleFault(){
 }
 
 // ===== ラリー =====
-function setCause(p){ current.causePlayer=p; state="rally1"; render(); }
+function setCause(p){ current.causePlayer=p; state="rally"; render(); }
 
-function setDetail(k,v){
-  current.detail[k]=v;
+function setDetail(v){
+  current.detail.push(v);
+  rallyIndex++;
 
-  if(state==="rally1") state="rally2";
-  else if(state==="rally2") state="rally3";
-  else{
-    let winner = decide(current.causePlayer,current.detail.result);
-    let d=current.detail;
-    let action=d.side+d.style+d.result;
-
-    if(firstFaultFlag){
-      action="'"+action;
-    }
-
-    recordPoint(winner,action);
+  if(rallyIndex<3){
+    render();
     return;
   }
 
-  render();
+  let [side,style,result]=current.detail;
+
+  let winner = result==="A" ? current.causePlayer : switchPlayer(current.causePlayer);
+
+  let action=side+style+result;
+
+  if(firstFaultFlag){
+    action="'"+action;
+  }
+
+  recordPoint(winner,action);
 }
 
-// ===== 判定 =====
-function decide(p,r){
-  return r==="A" ? p : switchPlayer(p);
-}
-
-// ===== 核（統合処理）=====
+// ===== 核（①修正）=====
 function recordPoint(winner,actionType){
 
-  // 得点
   pointWon(winner);
 
   gamePointIndex++;
@@ -245,11 +245,10 @@ function recordPoint(winner,actionType){
     server:label(server)
   });
 
-  // ゲーム終了判定（デュース完全対応）
   let p0=match.currentGame[0];
   let p1=match.currentGame[1];
 
-  if(!tiebreak && p0>=4 || p1>=4){
+  if(!tiebreak && (p0>=4 || p1>=4)){
     if(Math.abs(p0-p1)>=2){
       gameWon(p0>p1?0:1);
     }
@@ -261,7 +260,7 @@ function recordPoint(winner,actionType){
   render();
 }
 
-// ===== 得点 =====
+// ===== 得点（③修正）=====
 function pointWon(p){
 
   let i=p==="me"?0:1;
@@ -271,7 +270,11 @@ function pointWon(p){
     tbPoints[i]++;
 
     tbServeCount++;
-    if(tbServeCount===1 || tbServeCount%2===1){
+
+    if(tbServeCount===1){
+      server=switchPlayer(server);
+    }
+    else if(tbServeCount%2===1){
       server=switchPlayer(server);
     }
 
@@ -335,7 +338,7 @@ function updateScore(){
   `;
 }
 
-// ===== シート =====
+// ===== シート（⑤修正）=====
 let sheet={};
 
 function buildSheet(){
@@ -350,10 +353,10 @@ function buildSheet(){
     let isMe=d.player.includes(info.myName);
 
     if(d.actionType==="WF"){
-      r.meM.push(text);
+      isMe ? r.meM.push(text) : r.opM.push(text);
     }
     else if(d.actionType==="SA"){
-      r.meP.push(text);
+      isMe ? r.meP.push(text) : r.opP.push(text);
     }
     else if(d.actionType.includes("A")){
       isMe?r.meP.push(text):r.opP.push(text);
@@ -388,4 +391,3 @@ updateScore();
 </script>
 </body>
 </html>
-このようなコードでテニスの結果を記録するものを作っています。

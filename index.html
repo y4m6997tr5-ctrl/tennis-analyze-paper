@@ -36,6 +36,14 @@ button {
   width:80%;
   padding:16px;
   margin:6px;
+  font-size:18px;
+}
+
+input {
+  width:80%;
+  padding:14px;
+  margin:8px;
+  font-size:18px;
 }
 </style>
 </head>
@@ -50,16 +58,12 @@ button {
 
 // ===== 基本 =====
 let info={mySchool:"",oppSchool:"",myName:"",oppName:"",firstServer:"me"};
-let state="setup",current={};
-
+let state="setup";
 let server="me";
 let servePhase=1;
 
-// ===== サーブ統計 =====
-let serveStats={
-  me:{total:0,firstIn:0,df:0},
-  opponent:{total:0,firstIn:0,df:0}
-};
+// ===== データ（分析用追加）=====
+let data=[];
 
 // ===== スコア =====
 let match={set:[0,0],game:[0,0],finished:false};
@@ -77,47 +81,34 @@ function name(p){ return p==="me"?info.myName:info.oppName; }
 
 // ===== UI =====
 function render(){
-  const app=appEl,ctrl=ctrlEl;
 
   if(state==="setup"){
     app.innerHTML=`
-    <input id="mySchool"><br>
-    <input id="oppSchool"><br>
-    <input id="myName"><br>
-    <input id="oppName"><br>
+    <input id="mySchool" placeholder="自校名"><br>
+    <input id="oppSchool" placeholder="相手校名"><br>
+    <input id="myName" placeholder="自分の名前"><br>
+    <input id="oppName" placeholder="相手の名前"><br>
     <button onclick="setFirst('me')">自分サーブ</button>
-    <button onclick="setFirst('opponent')">相手サーブ</button>`;
-    ctrl.innerHTML=`<button onclick="start()">開始</button>`;
+    <button onclick="setFirst('opponent')">相手サーブ</button>
+    `;
+    controls.innerHTML=`<button onclick="start()">試合開始</button>`;
+    return;
+  }
+
+  if(match.finished){
+    app.innerHTML="<h2>試合終了</h2>";
+    controls.innerHTML="";
     return;
   }
 
   if(state==="type"){
-    ctrl.innerHTML=`
-    <button onclick="type('SA')">SA</button>
-    <button onclick="type('F')">フォルト</button>
-    <button onclick="type('R')">ラリー</button>`;
+    controls.innerHTML=`
+      <button onclick="type('SA')">SA</button>
+      <button onclick="type('F')">フォルト</button>
+      <button onclick="type('R')">ラリー</button>
+    `;
   }
 
-  if(state==="cause"){
-    ctrl.innerHTML=`
-    <button onclick="cause('me')">自分</button>
-    <button onclick="cause('opponent')">相手</button>`;
-  }
-
-  if(state==="rally"){
-    if(step===0){
-      ctrl.innerHTML=`<button onclick="detail('F')">フォア</button><button onclick="detail('B')">バック</button>`;
-    }else if(step===1){
-      ctrl.innerHTML=`<button onclick="detail('S')">ストローク</button><button onclick="detail('V')">ボレー</button>`;
-    }else{
-      ctrl.innerHTML=`
-      <button onclick="detail('O')">アウト</button>
-      <button onclick="detail('N')">ネット</button>
-      <button onclick="detail('A')">エース</button>`;
-    }
-  }
-
-  // 白部分
   app.innerHTML=`
   <h3>${name(server)} サーブ</h3>
   <p>${servePhase===1?"1stサーブ":"2ndサーブ"}</p>
@@ -142,13 +133,14 @@ function updateScore(){
   ${info.mySchool} ${info.myName}
   vs
   ${info.oppSchool} ${info.oppName}<br>
-  ${match.set[0]}-${match.set[1]} |
-  ${scoreText()}
+  ゲーム ${match.set[0]}-${match.set[1]} |
+  ポイント ${scoreText()}
   `;
 }
 
 // ===== 開始 =====
 function setFirst(p){ info.firstServer=p; }
+
 function start(){
   info.mySchool=mySchool.value;
   info.oppSchool=oppSchool.value;
@@ -164,8 +156,7 @@ function start(){
 function type(t){
 
   if(t==="SA"){
-    serveStats[server].total++;
-    serveStats[server].firstIn++;
+    record(server,"SA");
     point(server);
     return;
   }
@@ -176,39 +167,28 @@ function type(t){
       render();
       return;
     }
-    serveStats[server].total++;
-    serveStats[server].df++;
+    record(sw(server),"DF");
     point(sw(server));
     return;
   }
 
-  state="cause";
-  render();
+  // ラリー（簡略）
+  let winner = prompt("最後に打ったのは？ me / opponent");
+  if(winner!=="me" && winner!=="opponent") return;
+
+  record(winner,"R");
+  point(winner);
 }
 
-let step=0;
-let causeP;
-
-function cause(p){
-  causeP=p;
-  step=0;
-  state="rally";
-  render();
-}
-
-function detail(v){
-  if(step===2){
-    let winner = v==="A"?causeP:sw(causeP);
-    point(winner);
-
-    // ★1回で戻る（修正）
-    state="type";
-    step=0;
-    render();
-    return;
-  }
-  step++;
-  render();
+// ===== データ記録（追加）=====
+function record(winner,type){
+  data.push({
+    winner,
+    server,
+    type,
+    set:[...match.set],
+    game:[...match.game]
+  });
 }
 
 // ===== 得点 =====
@@ -231,6 +211,7 @@ function point(p){
     }
 
     updateScore();
+    render();
     return;
   }
 
@@ -254,12 +235,13 @@ function point(p){
     }
   }
 
+  servePhase=1;
+
   updateScore();
+  render();
 }
 
 // ===== 初期 =====
-const appEl=document.getElementById("app");
-const ctrlEl=document.getElementById("controls");
 render();
 
 </script>

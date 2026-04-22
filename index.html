@@ -138,14 +138,15 @@ function updateScore(){
   `;
 }
 
-// ===== 開始 =====
+// ===== 開始（修正済）=====
 function setFirst(p){ info.firstServer=p; }
 
 function start(){
-  info.mySchool=mySchool.value;
-  info.oppSchool=oppSchool.value;
-  info.myName=myName.value;
-  info.oppName=oppName.value;
+  info.mySchool=document.getElementById("mySchool").value;
+  info.oppSchool=document.getElementById("oppSchool").value;
+  info.myName=document.getElementById("myName").value;
+  info.oppName=document.getElementById("oppName").value;
+
   server=info.firstServer;
   state="type";
   updateScore();
@@ -180,7 +181,7 @@ function type(t){
   point(winner);
 }
 
-// ===== 得点 =====
+// ===== 得点（修正済）=====
 function point(p){
 
   let i=p==="me"?0:1;

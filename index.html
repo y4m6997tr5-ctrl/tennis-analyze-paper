@@ -56,7 +56,7 @@ input {
 
 <script>
 
-// ===== DOM =====
+// ===== DOM（明示取得）=====
 const app = document.getElementById("app");
 const controls = document.getElementById("controls");
 const score = document.getElementById("score");
@@ -181,7 +181,7 @@ function type(t){
   point(winner);
 }
 
-// ===== 得点（修正済）=====
+// ===== 得点 =====
 function point(p){
 
   let i=p==="me"?0:1;
@@ -232,6 +232,11 @@ function point(p){
   updateScore();
   render();
 }
+
+// ===== ★重要：onclick対策 =====
+window.setFirst = setFirst;
+window.start = start;
+window.type = type;
 
 // ===== 初期 =====
 render();

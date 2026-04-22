@@ -32,19 +32,11 @@ body { font-family: sans-serif; margin:0; }
   align-items:center;
 }
 
-button {
-  width:80%;
-  padding:16px;
-  margin:6px;
-  font-size:18px;
-}
+button { width:80%; padding:16px; margin:6px; font-size:18px; }
+input { width:80%; padding:14px; margin:8px; font-size:18px; }
 
-input {
-  width:80%;
-  padding:14px;
-  margin:8px;
-  font-size:18px;
-}
+table { border-collapse:collapse; width:100%; font-size:12px; }
+td,th { border:1px solid black; padding:4px; text-align:center; }
 </style>
 </head>
 
@@ -56,36 +48,30 @@ input {
 
 <script>
 
-// ===== DOM =====
-const app = document.getElementById("app");
-const controls = document.getElementById("controls");
-const score = document.getElementById("score");
+// ===== 既存 =====
+const app=document.getElementById("app");
+const controls=document.getElementById("controls");
+const score=document.getElementById("score");
 
-// ===== 基本 =====
-let info={mySchool:"",oppSchool:"",myName:"",oppName:"",firstServer:"me"};
-let state="setup";
-let server="me";
-let servePhase=1;
+let info={mySchool:"",oppSchool:"",myName:"",oppName:""};
+let state="setup",server="me",servePhase=1;
 
-// ===== スコア =====
 let match={set:[0,0],game:[0,0],finished:false};
 
-// ===== タイブレーク =====
-let tiebreak=false;
-let tb=[0,0];
-let tbCount=0;
-
+let tiebreak=false,tb=[0,0],tbCount=0;
 const pointMap=[0,15,30,40];
 
-// ===== ラリー用 =====
 let current={};
 
+// ===== データ =====
+let data=[];
+
 // ===== 共通 =====
-function sw(p){ return p==="me"?"opponent":"me"; }
+function sw(p){return p==="me"?"opponent":"me";}
 function nameFull(p){
   return p==="me"
-    ? info.mySchool+" "+info.myName
-    : info.oppSchool+" "+info.oppName;
+  ? info.mySchool+" "+info.myName
+  : info.oppSchool+" "+info.oppName;
 }
 
 // ===== UI =====
@@ -104,7 +90,7 @@ function render(){
   }
 
   if(match.finished){
-    app.innerHTML="<h2>試合終了</h2>";
+    app.innerHTML=renderSheet();
     controls.innerHTML="";
     return;
   }
@@ -115,9 +101,9 @@ function render(){
       <button id="fault">フォルト</button>
       <button id="rally">ラリー</button>
     `;
-    document.getElementById("sa").onclick=()=>type("SA");
-    document.getElementById("fault").onclick=()=>type("F");
-    document.getElementById("rally").onclick=()=>type("R");
+    sa.onclick=()=>type("SA");
+    fault.onclick=()=>type("F");
+    rally.onclick=()=>type("R");
   }
 
   else if(state==="cause"){
@@ -125,8 +111,8 @@ function render(){
       <button id="me">${nameFull("me")}</button>
       <button id="op">${nameFull("opponent")}</button>
     `;
-    document.getElementById("me").onclick=()=>{current.player="me"; next("side");};
-    document.getElementById("op").onclick=()=>{current.player="opponent"; next("side");};
+    me.onclick=()=>{current.player="me";next("side");};
+    op.onclick=()=>{current.player="opponent";next("side");};
   }
 
   else if(state==="side"){
@@ -134,8 +120,8 @@ function render(){
       <button id="f">フォア</button>
       <button id="b">バック</button>
     `;
-    document.getElementById("f").onclick=()=>{current.side="F"; next("style");};
-    document.getElementById("b").onclick=()=>{current.side="B"; next("style");};
+    f.onclick=()=>{current.side="F";next("style");};
+    b.onclick=()=>{current.side="B";next("style");};
   }
 
   else if(state==="style"){
@@ -143,8 +129,8 @@ function render(){
       <button id="s">ストローク</button>
       <button id="v">ボレー</button>
     `;
-    document.getElementById("s").onclick=()=>{current.style="S"; next("result");};
-    document.getElementById("v").onclick=()=>{current.style="V"; next("result");};
+    s.onclick=()=>{current.style="S";next("result");};
+    v.onclick=()=>{current.style="V";next("result");};
   }
 
   else if(state==="result"){
@@ -153,25 +139,27 @@ function render(){
       <button id="n">ネット</button>
       <button id="a">エース</button>
     `;
-    document.getElementById("o").onclick=()=>finish("O");
-    document.getElementById("n").onclick=()=>finish("N");
-    document.getElementById("a").onclick=()=>finish("A");
+    o.onclick=()=>finish("O");
+    n.onclick=()=>finish("N");
+    a.onclick=()=>finish("A");
   }
 
   app.innerHTML=`
   <h3>${nameFull(server)} サーブ</h3>
-  <p>${servePhase===1?"1stサーブ":"2ndサーブ"}</p>
+  <p>${servePhase===1?"1st":"2nd"}サーブ</p>
   `;
 }
 
-function next(s){ state=s; render(); }
+function next(s){state=s;render();}
 
 // ===== 入力 =====
 function type(t){
-  if(t==="SA"){ point(server); return; }
+
+  if(t==="SA"){ record(server,"SA"); point(server); return; }
 
   if(t==="F"){
     if(servePhase===1){ servePhase=2; render(); return; }
+    record(sw(server),"DF");
     point(sw(server));
     return;
   }
@@ -181,9 +169,31 @@ function type(t){
   render();
 }
 
+// ===== ★修正：ラリー詳細保存 =====
 function finish(r){
-  let winner = (r==="A") ? current.player : sw(current.player);
+  current.result = r;
+
+  let winner=(r==="A")?current.player:sw(current.player);
+
+  record(winner,"R",{
+    player: current.player,
+    side: current.side,
+    style: current.style,
+    result: r
+  });
+
   point(winner);
+}
+
+// ===== ★修正：record拡張 =====
+function record(winner,type,detail={}){
+  data.push({
+    winner,
+    server,
+    type,
+    detail,
+    set:[...match.set]
+  });
 }
 
 // ===== スコア =====
@@ -192,9 +202,9 @@ function scoreText(){
 
   let a=match.game[0],b=match.game[1];
 
-  if(a>=3 && b>=3){
-    if(a===b) return "デュース";
-    return a>b ? "Ad "+info.myName : "Ad "+info.oppName;
+  if(a>=3&&b>=3){
+    if(a===b)return"デュース";
+    return a>b?"Ad "+info.myName:"Ad "+info.oppName;
   }
   return pointMap[a]+"-"+pointMap[b];
 }
@@ -216,21 +226,15 @@ function point(p){
   if(tiebreak){
     tb[i]++;
     tbCount++;
+    if(tbCount===1||tbCount%2===1) server=sw(server);
 
-    if(tbCount===1 || tbCount%2===1){
-      server=sw(server);
-    }
-
-    if(tb[i]>=7 && tb[i]-tb[o]>=2){
+    if(tb[i]>=7&&tb[i]-tb[o]>=2){
       match.set[i]++;
       match.finished=true;
     }
 
-    servePhase=1;
-    state="type";
-    updateScore();
-    render();
-    return;
+    servePhase=1; state="type";
+    updateScore(); render(); return;
   }
 
   match.game[i]++;
@@ -240,33 +244,102 @@ function point(p){
     match.game=[0,0];
     server=sw(server);
 
-    if(match.set[0]===6 && match.set[1]===6){
-      tiebreak=true;
-      tb=[0,0];
-      tbCount=0;
+    if(match.set[0]===6&&match.set[1]===6){
+      tiebreak=true; tb=[0,0]; tbCount=0;
     }
 
-    if(match.set[i]>=6 && Math.abs(match.set[0]-match.set[1])>=2){
+    if(match.set[i]>=6&&Math.abs(match.set[0]-match.set[1])>=2){
       match.finished=true;
     }
   }
 
-  servePhase=1;
-  state="type";
-  updateScore();
-  render();
+  servePhase=1; state="type";
+  updateScore(); render();
+}
+
+// ===== ★完全版分析 =====
+function renderSheet(){
+
+  let games = {};
+  let pointIndex = {};
+
+  data.forEach((d, idx)=>{
+
+    let g = d.set[0] + d.set[1] + 1;
+
+    if(!games[g]){
+      games[g] = { meP:[], meM:[], opP:[], opM:[] };
+      pointIndex[g] = 1;
+    }
+
+    let num = pointIndex[g]++;
+    let circled = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"][num-1] || num;
+
+    let mark = "";
+
+    if(d.type==="SA"){
+      mark = "SA";
+    }
+    else if(d.type==="DF"){
+      mark = "WF";
+    }
+    else if(d.type==="R"){
+      let dt = d.detail || {};
+      mark = (dt.side||"")+(dt.style||"")+(dt.result||"");
+    }
+
+    // 2ndサーブ判定
+    let isSecond = false;
+    if(idx>0){
+      let prev = data[idx-1];
+      if(prev.server===d.server && prev.type==="F"){
+        isSecond = true;
+      }
+    }
+
+    if(isSecond) mark = "’"+mark;
+
+    mark = circled + mark;
+
+    if(d.server==="me"){
+      if(d.winner==="me") games[g].meP.push(mark);
+      else games[g].meM.push(mark);
+    }else{
+      if(d.winner==="me") games[g].opM.push(mark);
+      else games[g].opP.push(mark);
+    }
+
+  });
+
+  let html="<table><tr><th>G</th><th>P</th><th>M</th><th></th><th>P</th><th>M</th></tr>";
+
+  let maxGame = Math.max(...Object.keys(games).map(Number),1);
+
+  for(let i=1;i<=maxGame;i++){
+    let g = games[i] || {meP:[],meM:[],opP:[],opM:[]};
+
+    html+=`<tr>
+    <td>${i}</td>
+    <td>${g.meP.join("<br>")}</td>
+    <td>${g.meM.join("<br>")}</td>
+    <td></td>
+    <td>${g.opP.join("<br>")}</td>
+    <td>${g.opM.join("<br>")}</td>
+    </tr>`;
+  }
+
+  html+="</table>";
+  return html;
 }
 
 // ===== 開始 =====
 function start(){
-  info.mySchool=document.getElementById("mySchool").value;
-  info.oppSchool=document.getElementById("oppSchool").value;
-  info.myName=document.getElementById("myName").value;
-  info.oppName=document.getElementById("oppName").value;
-
+  info.mySchool=mySchool.value;
+  info.oppSchool=oppSchool.value;
+  info.myName=myName.value;
+  info.oppName=oppName.value;
   state="type";
-  updateScore();
-  render();
+  updateScore(); render();
 }
 
 // ===== 初期 =====

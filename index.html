@@ -77,6 +77,9 @@ let tbCount=0;
 
 const pointMap=[0,15,30,40];
 
+// ===== ラリー用 =====
+let current={};
+
 // ===== 共通 =====
 function sw(p){ return p==="me"?"opponent":"me"; }
 function name(p){ return p==="me"?info.myName:info.oppName; }
@@ -94,11 +97,9 @@ function render(){
     <button id="meServe">自分サーブ</button>
     <button id="opServe">相手サーブ</button>
     `;
-
     document.getElementById("startBtn").onclick = start;
     document.getElementById("meServe").onclick = ()=>setFirst("me");
     document.getElementById("opServe").onclick = ()=>setFirst("opponent");
-
     return;
   }
 
@@ -108,20 +109,82 @@ function render(){
     return;
   }
 
-  controls.innerHTML=`
-    <button id="sa">SA</button>
-    <button id="fault">フォルト</button>
-    <button id="rally">ラリー</button>
-  `;
+  // ===== 入力フロー =====
+  if(state==="type"){
+    controls.innerHTML=`
+      <button id="sa">SA</button>
+      <button id="fault">フォルト</button>
+      <button id="rally">ラリー</button>
+    `;
+    document.getElementById("sa").onclick=()=>type("SA");
+    document.getElementById("fault").onclick=()=>type("F");
+    document.getElementById("rally").onclick=()=>type("R");
+  }
 
-  document.getElementById("sa").onclick = ()=>type("SA");
-  document.getElementById("fault").onclick = ()=>type("F");
-  document.getElementById("rally").onclick = ()=>type("R");
+  else if(state==="cause"){
+    controls.innerHTML=`
+      <button id="me">自分</button>
+      <button id="op">相手</button>
+    `;
+    document.getElementById("me").onclick=()=>{current.player="me"; next("side");};
+    document.getElementById("op").onclick=()=>{current.player="opponent"; next("side");};
+  }
+
+  else if(state==="side"){
+    controls.innerHTML=`
+      <button id="f">フォア</button>
+      <button id="b">バック</button>
+    `;
+    document.getElementById("f").onclick=()=>{current.side="F"; next("style");};
+    document.getElementById("b").onclick=()=>{current.side="B"; next("style");};
+  }
+
+  else if(state==="style"){
+    controls.innerHTML=`
+      <button id="s">ストローク</button>
+      <button id="v">ボレー</button>
+    `;
+    document.getElementById("s").onclick=()=>{current.style="S"; next("result");};
+    document.getElementById("v").onclick=()=>{current.style="V"; next("result");};
+  }
+
+  else if(state==="result"){
+    controls.innerHTML=`
+      <button id="o">アウト</button>
+      <button id="n">ネット</button>
+      <button id="a">エース</button>
+    `;
+    document.getElementById("o").onclick=()=>finish("O");
+    document.getElementById("n").onclick=()=>finish("N");
+    document.getElementById("a").onclick=()=>finish("A");
+  }
 
   app.innerHTML=`
   <h3>${name(server)} サーブ</h3>
   <p>${servePhase===1?"1stサーブ":"2ndサーブ"}</p>
   `;
+}
+
+function next(s){ state=s; render(); }
+
+// ===== 入力 =====
+function type(t){
+  if(t==="SA"){ point(server); return; }
+
+  if(t==="F"){
+    if(servePhase===1){ servePhase=2; render(); return; }
+    point(sw(server));
+    return;
+  }
+
+  current={};
+  state="cause";
+  render();
+}
+
+function finish(r){
+  let winner = (r==="A") ? current.player : sw(current.player);
+  point(winner);
 }
 
 // ===== スコア =====
@@ -139,12 +202,60 @@ function scoreText(){
 
 function updateScore(){
   score.innerHTML=`
-  ${info.mySchool} ${info.myName}
-  vs
-  ${info.oppSchool} ${info.oppName}<br>
+  ${info.mySchool} ${info.myName} vs ${info.oppSchool} ${info.oppName}<br>
   ゲーム ${match.set[0]}-${match.set[1]} |
   ポイント ${scoreText()}
   `;
+}
+
+// ===== 得点 =====
+function point(p){
+
+  let i=p==="me"?0:1;
+  let o=i===0?1:0;
+
+  if(tiebreak){
+    tb[i]++;
+    tbCount++;
+
+    if(tbCount===1 || tbCount%2===1){
+      server=sw(server);
+    }
+
+    if(tb[i]>=7 && tb[i]-tb[o]>=2){
+      match.set[i]++;
+      match.finished=true;
+    }
+
+    servePhase=1;
+    state="type";
+    updateScore();
+    render();
+    return;
+  }
+
+  match.game[i]++;
+
+  if((match.game[i]>=4)&&Math.abs(match.game[i]-match.game[o])>=2){
+    match.set[i]++;
+    match.game=[0,0];
+    server=sw(server);
+
+    if(match.set[0]===6 && match.set[1]===6){
+      tiebreak=true;
+      tb=[0,0];
+      tbCount=0;
+    }
+
+    if(match.set[i]>=6 && Math.abs(match.set[0]-match.set[1])>=2){
+      match.finished=true;
+    }
+  }
+
+  servePhase=1;
+  state="type";
+  updateScore();
+  render();
 }
 
 // ===== 開始 =====
@@ -157,54 +268,6 @@ function start(){
   info.oppName=document.getElementById("oppName").value;
 
   server=info.firstServer;
-  state="type";
-  updateScore();
-  render();
-}
-
-// ===== 入力 =====
-function type(t){
-
-  if(t==="SA"){
-    point(server);
-    return;
-  }
-
-  if(t==="F"){
-    if(servePhase===1){
-      servePhase=2;
-      render();
-      return;
-    }
-    point(sw(server));
-    return;
-  }
-
-  let winner = prompt("最後に打ったのは？ me / opponent");
-
-  if(winner!=="me" && winner!=="opponent"){
-    alert("me か opponent を入力");
-    return;
-  }
-
-  point(winner);
-}
-
-// ===== 得点 =====
-function point(p){
-
-  let i=p==="me"?0:1;
-  let o=i===0?1:0;
-
-  match.game[i]++;
-
-  if((match.game[i]>=4)&&Math.abs(match.game[i]-match.game[o])>=2){
-    match.set[i]++;
-    match.game=[0,0];
-    server=sw(server);
-  }
-
-  servePhase=1;
   state="type";
   updateScore();
   render();

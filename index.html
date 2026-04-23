@@ -48,7 +48,7 @@ td,th { border:1px solid black; padding:4px; text-align:center; }
 
 <script>
 
-// ===== 既存 =====
+// ===== 基本 =====
 const app=document.getElementById("app");
 const controls=document.getElementById("controls");
 const score=document.getElementById("score");
@@ -62,8 +62,6 @@ let tiebreak=false,tb=[0,0],tbCount=0;
 const pointMap=[0,15,30,40];
 
 let current={};
-
-// ===== 追加 =====
 let data=[];
 let isSecondServe=false;
 
@@ -86,7 +84,7 @@ function render(){
     <input id="oppName" placeholder="相手の名前"><br>
     `;
     controls.innerHTML=`<button id="startBtn">試合開始</button>`;
-    document.getElementById("startBtn").onclick=start;
+    startBtn.onclick=start;
     return;
   }
 
@@ -170,14 +168,14 @@ function type(t){
       render();
       return;
     }
-    record(sw(server),"DF",{second:true});
+    record(server,"DF",{second:true});
     isSecondServe=false;
     point(sw(server));
     return;
   }
 
   current={};
-  current.second = isSecondServe;
+  current.second=isSecondServe;
   isSecondServe=false;
 
   state="cause";
@@ -186,7 +184,7 @@ function type(t){
 
 // ===== ラリー =====
 function finish(r){
-  current.result = r;
+  current.result=r;
 
   let winner=(r==="A")?current.player:sw(current.player);
 
@@ -276,26 +274,20 @@ function point(p){
 // ===== 分析シート =====
 function renderSheet(){
 
-  let games = {};
-  let pointIndex = {};
+  let games={};
+  let pointIndex={};
 
-  data.forEach((d)=>{
+  data.forEach(d=>{
 
-    let g = d.set[0] + d.set[1] + 1;
+    let g=d.set[0]+d.set[1]+1;
 
     if(!games[g]){
-      games[g] = {
-        meP:[], meM:[], opP:[], opM:[],
-        score:"",
-        serveTotal:0,
-        serveFirst:0,
-        serveWF:0
-      };
-      pointIndex[g] = 1;
+      games[g]={meP:[],meM:[],opP:[],opM:[],score:"",serveTotal:0,serveFirst:0,serveWF:0};
+      pointIndex[g]=1;
     }
 
-    let num = pointIndex[g]++;
-    let circled = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"][num-1] || num;
+    let num=pointIndex[g]++;
+    let circled=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"][num-1]||num;
 
     let mark="";
 
@@ -306,40 +298,63 @@ function renderSheet(){
       mark=(dt.side||"")+(dt.style||"")+(dt.result||"");
     }
 
-    if(d.detail && d.detail.second) mark="’"+mark;
+    // ★ 特別ルール：WFは’なし
+    if(d.detail && d.detail.second && d.type!=="DF"){
+      mark="’"+mark;
+    }
 
     mark=circled+mark;
 
-    if(d.server==="me"){
-      if(d.winner==="me") games[g].meP.push(mark);
-      else games[g].meM.push(mark);
-    }else{
-      if(d.winner==="me") games[g].opM.push(mark);
+    // ===== ルール② =====
+    if(d.type==="R"){
+      let p=d.detail.player;
+      let r=d.detail.result;
+
+      if(p==="me"){
+        if(r==="A") games[g].meP.push(mark);
+        else games[g].meM.push(mark);
+      }else{
+        if(r==="A") games[g].opP.push(mark);
+        else games[g].opM.push(mark);
+      }
+
+      if(r==="N"||r==="O"){
+        if(p==="opponent") games[g].meP.push(mark);
+        else games[g].opP.push(mark);
+      }
+    }
+
+    else if(d.type==="SA"){
+      if(d.server==="me") games[g].meP.push(mark);
       else games[g].opP.push(mark);
     }
 
-    games[g].score = `${d.set[0]}-${d.set[1]}`;
+    else if(d.type==="DF"){
+      if(d.server==="me") games[g].meM.push(mark);
+      else games[g].opM.push(mark);
+    }
+
+    // ★ ルール⑤：そのゲームの「最後の記録」を採用
+    games[g].score=`${d.set[0]}-${d.set[1]}`;
 
     if(d.server==="me"){
       games[g].serveTotal++;
       if(d.type==="SA") games[g].serveFirst++;
       if(d.type==="DF") games[g].serveWF++;
     }
+
   });
 
   let html=`
   <table>
     <tr>
-      <th colspan="8">
-        清真学園高校テニス部　分析シート　[　　　　　]
-        　　　大会名：[　　　　　]
-      </th>
+      <th colspan="8">分析シート [　　　　　]　大会名：[　　　　　]</th>
     </tr>
     <tr>
       <th rowspan="2">ゲーム</th>
-      <th colspan="2">${info.mySchool}<br>氏名：${info.myName}</th>
-      <th rowspan="2">ゲームスコア</th>
-      <th colspan="2">対戦高：${info.oppSchool}<br>氏名：${info.oppName}</th>
+      <th colspan="2">${info.mySchool}<br>${info.myName}</th>
+      <th rowspan="2">スコア</th>
+      <th colspan="2">${info.oppSchool}<br>${info.oppName}</th>
       <th rowspan="2">1st%</th>
       <th rowspan="2">WF%</th>
     </tr>
@@ -350,24 +365,17 @@ function renderSheet(){
   `;
 
   for(let i=1;i<=8;i++){
+    let g=games[i]||{meP:[],meM:[],opP:[],opM:[],score:"",serveTotal:0,serveFirst:0,serveWF:0};
 
-    let g = games[i] || {
-      meP:[],meM:[],opP:[],opM:[],
-      score:"",
-      serveTotal:0,
-      serveFirst:0,
-      serveWF:0
-    };
-
-    let first = g.serveTotal ? Math.round(g.serveFirst/g.serveTotal*100) : "";
-    let wf = g.serveTotal ? Math.round(g.serveWF/g.serveTotal*100) : "";
+    let first=g.serveTotal?Math.round(g.serveFirst/g.serveTotal*100):"";
+    let wf=g.serveTotal?Math.round(g.serveWF/g.serveTotal*100):"";
 
     html+=`
     <tr>
       <td>${i}</td>
       <td>${g.meP.join("<br>")}</td>
       <td>${g.meM.join("<br>")}</td>
-      <td>${g.score || "—"}</td>
+      <td>${g.score||"—"}</td>
       <td>${g.opP.join("<br>")}</td>
       <td>${g.opM.join("<br>")}</td>
       <td>${first!==""?first+"%":""}</td>
